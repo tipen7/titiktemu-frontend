@@ -1,72 +1,31 @@
 "use client";
 
-import * as React from "react";
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
 import { cva, type VariantProps } from "class-variance-authority";
-import { cn } from "cn";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-
-import { useIsMobile } from "@/app/hooks/use-mobile";
-import { Button } from "@/app/components/ui/button";
-import { Input } from "@/app/components/ui/input";
-import { Separator } from "@/app/components/ui/separator";
+import { PanelLeftIcon } from "lucide-react";
+import * as React from "react";
+import { Button } from "./button";
+import { Input } from "./input";
+import { Separator } from "./separator";
 import {
   Sheet,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
-} from "@/app/components/ui/sheet";
-import { Skeleton } from "@/app/components/ui/skeleton";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/app/components/ui/tooltip";
-import {
-  FileChartColumnIncreasing,
-  FilePenLine,
-  Home,
-  LogOut,
-  Map,
-  PanelLeftIcon,
-  UsersRound,
-  PaletteIcon,
-} from "lucide-react";
+} from "./sheet";
+import { Skeleton } from "./skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip";
+import { useIsMobile } from "@/app/hooks/use-mobile";
+import { cn } from "cn";
 
-const sidebarItems = [
-  { label: "Beranda", href: "/beranda/", icon: Home },
-  {
-    label: "UMKM Self-Tracker",
-    href: "/umkm-self-tracker/",
-    icon: FilePenLine,
-  },
-  {
-    label: "ESG Dashboard",
-    href: "/esg-dashboard/",
-    icon: FileChartColumnIncreasing,
-  },
-  {
-    label: "Laporan Alokasi",
-    href: "/laporan-alokasi/",
-    icon: FileChartColumnIncreasing,
-  },
-  { label: "Tenant Matching", href: "/tenant-matching/", icon: UsersRound },
-  { label: "Discovery Map", href: "/discovery-map/", icon: Map },
-  {
-    label: "Design System",
-    href: "/design-system/",
-    icon: PaletteIcon,
-  },
-] as const;
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
-const SIDEBAR_WIDTH = "18rem";
+const SIDEBAR_WIDTH = "16rem";
 const SIDEBAR_WIDTH_MOBILE = "18rem";
-const SIDEBAR_WIDTH_ICON = "7.25rem";
+const SIDEBAR_WIDTH_ICON = "5rem";
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
 
 type SidebarContextProps = {
@@ -119,7 +78,7 @@ function SidebarProvider({
         _setOpen(openState);
       }
 
-      // This sets the cookie to keep the sidebar state.
+      // biome-ignore lint/suspicious/noDocumentCookie: Cookie Store API not universally supported yet
       document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
     },
     [setOpenProp, open],
@@ -128,15 +87,12 @@ function SidebarProvider({
   // Helper to toggle the sidebar.
   const toggleSidebar = React.useCallback(() => {
     return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open);
-  }, [isMobile, setOpen, setOpenMobile]);
+  }, [isMobile, setOpen]);
 
   // Adds a keyboard shortcut to toggle the sidebar.
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (
-        event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
-        (event.metaKey || event.ctrlKey)
-      ) {
+      if (event.key === SIDEBAR_KEYBOARD_SHORTCUT && (event.metaKey || event.ctrlKey)) {
         event.preventDefault();
         toggleSidebar();
       }
@@ -160,7 +116,7 @@ function SidebarProvider({
       setOpenMobile,
       toggleSidebar,
     }),
-    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar],
+    [state, open, setOpen, isMobile, openMobile, toggleSidebar],
   );
 
   return (
@@ -189,7 +145,7 @@ function SidebarProvider({
 function Sidebar({
   side = "left",
   variant = "sidebar",
-  collapsible = "icon",
+  collapsible = "offcanvas",
   className,
   children,
   dir,
@@ -200,56 +156,6 @@ function Sidebar({
   collapsible?: "offcanvas" | "icon" | "none";
 }) {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
-  const pathname = usePathname();
-
-  const navigation = (
-    <>
-      <div className="flex items-center gap-3 px-6 pb-8 pt-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary-700 text-neutral-0">
-          <Map className="size-6" />
-        </div>
-        <span className="font-sans text-h6 font-semibold tracking-tight text-secondary-800 group-data-[collapsible=icon]:hidden">
-          TitikTemu
-        </span>
-      </div>
-      <nav className="flex flex-1 flex-col gap-2 px-4 group-data-[collapsible=icon]:px-2">
-        {sidebarItems.map(({ label, href, icon: Icon }) => {
-          const active = pathname === href || pathname.startsWith(href);
-
-          return (
-            <Link
-              key={href}
-              href={href}
-              onClick={() => isMobile && setOpenMobile(false)}
-              title={state === "collapsed" ? label : undefined}
-              className={cn(
-                "group flex min-h-14 items-center gap-4 rounded-xl px-4 font-sans text-b7 text-primary-600 transition-colors hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-300 group-data-[collapsible=icon]:size-14 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0",
-                active && "bg-primary-700 text-neutral-0 hover:bg-primary-700",
-              )}
-            >
-              <Icon className="size-6 shrink-0" strokeWidth={2} />
-              <span className="truncate group-data-[collapsible=icon]:hidden">
-                {label}
-              </span>
-            </Link>
-          );
-        })}
-      </nav>
-      <div className="mt-auto px-4 pb-6 pt-8 group-data-[collapsible=icon]:px-2">
-        <button
-          type="button"
-          onClick={() => isMobile && setOpenMobile(false)}
-          title={state === "collapsed" ? "Logout" : undefined}
-          className="flex min-h-14 w-full items-center gap-4 rounded-xl px-4 font-sans text-b7 text-[#e50909] transition-colors hover:bg-[#fff0f0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e50909]/30 group-data-[collapsible=icon]:size-14 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0"
-        >
-          <LogOut className="size-6 shrink-0" strokeWidth={2} />
-          <span className="truncate group-data-[collapsible=icon]:hidden">
-            Logout
-          </span>
-        </button>
-      </div>
-    </>
-  );
 
   if (collapsible === "none") {
     return (
@@ -286,7 +192,7 @@ function Sidebar({
             <SheetTitle>Sidebar</SheetTitle>
             <SheetDescription>Displays the mobile sidebar.</SheetDescription>
           </SheetHeader>
-          <div className="flex h-full w-full flex-col">{navigation}</div>
+          <div className="flex h-full w-full flex-col">{children}</div>
         </SheetContent>
       </Sheet>
     );
@@ -331,37 +237,22 @@ function Sidebar({
           data-slot="sidebar-inner"
           className="flex size-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:shadow-sm group-data-[variant=floating]:ring-1 group-data-[variant=floating]:ring-sidebar-border"
         >
-          {navigation}
+          {children}
         </div>
       </div>
     </div>
   );
 }
 
-function SidebarTrigger({
-  className,
-  onClick,
-  ...props
-}: React.ComponentProps<typeof Button>) {
-  const { isMobile, state, toggleSidebar } = useSidebar();
+function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<typeof Button>) {
+  const { toggleSidebar } = useSidebar();
 
   return (
     <Button
       data-sidebar="trigger"
       data-slot="sidebar-trigger"
-      variant="ghost"
-      size="icon-sm"
-      className={cn(
-        "fixed top-4 z-30 bg-neutral-0 text-primary-700 shadow-sm transition-[left] duration-200 hover:bg-primary-50",
-        className,
-      )}
-      style={{
-        left: isMobile
-          ? "1rem"
-          : state === "collapsed"
-            ? "calc(var(--sidebar-width-icon) + 1rem)"
-            : "calc(var(--sidebar-width) + 1rem)",
-      }}
+      variant="primary-ghost"
+      className={cn("mt-2 ml-2", className)}
       onClick={(event) => {
         onClick?.(event);
         toggleSidebar();
@@ -412,10 +303,7 @@ function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
   );
 }
 
-function SidebarInput({
-  className,
-  ...props
-}: React.ComponentProps<typeof Input>) {
+function SidebarInput({ className, ...props }: React.ComponentProps<typeof Input>) {
   return (
     <Input
       data-slot="sidebar-input"
@@ -448,10 +336,7 @@ function SidebarFooter({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-function SidebarSeparator({
-  className,
-  ...props
-}: React.ComponentProps<typeof Separator>) {
+function SidebarSeparator({ className, ...props }: React.ComponentProps<typeof Separator>) {
   return (
     <Separator
       data-slot="sidebar-separator"
@@ -535,10 +420,7 @@ function SidebarGroupAction({
   });
 }
 
-function SidebarGroupContent({
-  className,
-  ...props
-}: React.ComponentProps<"div">) {
+function SidebarGroupContent({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="sidebar-group-content"
@@ -677,10 +559,7 @@ function SidebarMenuAction({
   });
 }
 
-function SidebarMenuBadge({
-  className,
-  ...props
-}: React.ComponentProps<"div">) {
+function SidebarMenuBadge({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="sidebar-menu-badge"
@@ -713,12 +592,7 @@ function SidebarMenuSkeleton({
       className={cn("flex h-8 items-center gap-2 rounded-md px-2", className)}
       {...props}
     >
-      {showIcon && (
-        <Skeleton
-          className="size-4 rounded-md"
-          data-sidebar="menu-skeleton-icon"
-        />
-      )}
+      {showIcon && <Skeleton className="size-4 rounded-md" data-sidebar="menu-skeleton-icon" />}
       <Skeleton
         className="h-4 max-w-(--skeleton-width) flex-1"
         data-sidebar="menu-skeleton-text"
@@ -746,10 +620,7 @@ function SidebarMenuSub({ className, ...props }: React.ComponentProps<"ul">) {
   );
 }
 
-function SidebarMenuSubItem({
-  className,
-  ...props
-}: React.ComponentProps<"li">) {
+function SidebarMenuSubItem({ className, ...props }: React.ComponentProps<"li">) {
   return (
     <li
       data-slot="sidebar-menu-sub-item"

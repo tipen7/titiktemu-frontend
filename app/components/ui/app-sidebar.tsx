@@ -8,6 +8,7 @@ import {
   Home,
   Map,
   MapPinned,
+  PaletteIcon,
   UsersRound,
 } from "lucide-react";
 import {
@@ -40,6 +41,7 @@ const navigationItems = [
   },
   { label: "Tenant Matching", href: "/tenant-matching/", icon: UsersRound },
   { label: "Discovery Map", href: "/discovery-map/", icon: Map },
+  { label: "Design System", href: "/design-system/", icon: PaletteIcon },
 ] as const;
 
 export function AppSidebar() {

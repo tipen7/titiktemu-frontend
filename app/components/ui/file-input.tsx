@@ -45,7 +45,7 @@ function FileInput({
         "flex min-h-32 w-full cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-neutral-400 bg-neutral-50 px-4 py-5 font-sans text-b8 text-neutral-600 transition-colors hover:border-primary-500 hover:bg-primary-50 focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-200 sm:min-h-36 sm:text-b7",
         file && "border-primary-500 bg-neutral-0 text-primary-600",
         disabled &&
-          "pointer-events-none border-neutral-300 bg-neutral-200 text-neutral-400",
+          "cursor-not-allowed border-neutral-300 bg-neutral-200 text-neutral-400",
         className,
       )}
     >

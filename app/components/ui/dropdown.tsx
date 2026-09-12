@@ -1,7 +1,4 @@
 "use client";
-
-import * as React from "react";
-import { ChevronDownIcon } from "lucide-react";
 import { cn } from "cn";
 import {
   Select,
@@ -56,11 +53,14 @@ function Dropdown({
         )}
       >
         <SelectValue placeholder={placeholder} />
-        <ChevronDownIcon className="size-4 shrink-0 text-current sm:size-5" />
       </SelectTrigger>
       <SelectContent
+        side="bottom"
+        align="start"
+        sideOffset={4}
+        alignItemWithTrigger={false}
         className={cn(
-          "w-(--anchor-width) min-w-0 rounded-lg border-0 bg-neutral-100 p-2 shadow-none ring-0",
+          "w-(--anchor-width) min-w-0 origin-(--transform-origin) rounded-lg border-0 bg-neutral-100 p-2 shadow-none ring-0 transition-[opacity,transform] duration-150 ease-out data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-[side=bottom]:slide-in-from-top-1 data-[side=top]:slide-in-from-bottom-1 data-[side=left]:slide-in-from-right-1 data-[side=right]:slide-in-from-left-1",
           contentClassName,
         )}
       >

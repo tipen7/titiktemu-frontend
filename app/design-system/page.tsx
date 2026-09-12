@@ -7,41 +7,21 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/app/components/ui/accordion";
-import { Alert, AlertDescription, AlertTitle } from "@/app/components/ui/alert";
+import {
+  Alert,
+  AlertAction,
+  AlertClose,
+  AlertDescription,
+  AlertIcon,
+  AlertTitle,
+} from "@/app/components/ui/alert";
 import { Badge } from "@/app/components/ui/badge";
 import { Button } from "@/app/components/ui/button";
-import { Checkbox } from "@/app/components/ui/checkbox";
+import { Checkbox, CheckboxField } from "@/app/components/ui/checkbox";
 import { Dropdown } from "@/app/components/ui/dropdown";
 import { FileInput } from "@/app/components/ui/file-input";
 import { FieldLabel, Input } from "@/app/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/app/components/ui/radio-group";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/app/components/ui/select";
-import { Separator } from "@/app/components/ui/separator";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/app/components/ui/sheet";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-} from "@/app/components/ui/sidebar";
 import { Skeleton } from "@/app/components/ui/skeleton";
 import {
   Tooltip,
@@ -49,7 +29,17 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/app/components/ui/tooltip";
-import { Check, CheckCircle2, Info, Upload, User, X } from "lucide-react";
+import {
+  Check,
+  CircleAlert,
+  CircleCheck,
+  CircleX,
+  Info,
+  Train,
+  TriangleAlert,
+  User,
+  X,
+} from "lucide-react";
 
 const sections = [
   ["button", "Button"],
@@ -57,16 +47,12 @@ const sections = [
   ["input", "Input"],
   ["file-input", "File input"],
   ["dropdown", "Dropdown"],
-  ["select", "Select"],
   ["checkbox", "Checkbox"],
   ["radio-group", "Radio group"],
   ["alert", "Alert"],
   ["accordion", "Accordion"],
-  ["separator", "Separator"],
   ["skeleton", "Skeleton"],
   ["tooltip", "Tooltip"],
-  ["sheet", "Sheet"],
-  ["sidebar", "Sidebar"],
 ];
 
 function CodeBlock({ children }: { children: string }) {
@@ -115,9 +101,9 @@ function ComponentSection({
 }
 
 const dropdownOptions = [
-  { value: "one", label: "Choice 1" },
-  { value: "two", label: "Choice 2" },
-  { value: "three", label: "Choice 3" },
+  { value: "Fizi", label: "Fizi" },
+  { value: "Umar", label: "Umar" },
+  { value: "Stasiun Dukuh Atas BNI", label: "Stasiun Dukuh Atas BNI" },
 ];
 
 export default function DesignSystemPage() {
@@ -172,13 +158,38 @@ export default function DesignSystemPage() {
               <Button variant="primary">
                 <User />
                 Primary
+                <User />
               </Button>
-              <Button variant="primary-ghost">Primary ghost</Button>
-              <Button variant="secondary">Secondary</Button>
-              <Button variant="secondary-ghost">Secondary ghost</Button>
-              <Button variant="red">Red</Button>
-              <Button variant="red-ghost">Red ghost</Button>
-              <Button disabled>Disabled</Button>
+              <Button variant="primary-ghost">
+                <User />
+                Primary ghost
+                <User />
+              </Button>
+              <Button variant="secondary">
+                <User />
+                Secondary
+                <User />
+              </Button>
+              <Button variant="secondary-ghost">
+                <User />
+                Secondary ghost
+                <User />
+              </Button>
+              <Button variant="red">
+                <User />
+                Red
+                <User />
+              </Button>
+              <Button variant="red-ghost">
+                <User />
+                Red ghost
+                <User />
+              </Button>
+              <Button disabled>
+                <User />
+                Disabled
+                <User />
+              </Button>
             </ComponentSection>
 
             <ComponentSection
@@ -207,18 +218,37 @@ export default function DesignSystemPage() {
             >
               <div className="w-full max-w-md">
                 <FieldLabel required>Name</FieldLabel>
+                <Input startIcon={<User />} placeholder="Text" />
+              </div>
+              <div className="w-full max-w-md">
+                <FieldLabel required>Email</FieldLabel>
                 <Input
                   startIcon={<User />}
                   endIcon={<User />}
-                  placeholder="Text"
+                  placeholder="fizi@gmail.com"
                 />
               </div>
-              <Input
-                defaultValue="Filled value"
-                readOnly
-                className="max-w-xs"
-              />
-              <Input disabled placeholder="Disabled" className="max-w-xs" />
+
+              <div className="w-full max-w-md">
+                <FieldLabel>Autofill</FieldLabel>
+                <Input
+                  defaultValue="Filled value"
+                  startIcon={<User />}
+                  endIcon={<User />}
+                  readOnly
+                />
+              </div>
+
+              <div>
+                <FieldLabel>Autofill</FieldLabel>
+
+                <Input
+                  startIcon={<Train />}
+                  disabled
+                  placeholder="Stasiun MRT Blok M"
+                  className="max-w-xs"
+                />
+              </div>
             </ComponentSection>
 
             <ComponentSection
@@ -252,38 +282,34 @@ export default function DesignSystemPage() {
             </ComponentSection>
 
             <ComponentSection
-              id="select"
-              name="Select"
-              description="The low-level select primitives for custom composition."
-              code={`<Select defaultValue="all">
-  <SelectTrigger><SelectValue placeholder="Pilih X" /></SelectTrigger>
-  <SelectContent><SelectItem value="all">All regions</SelectItem></SelectContent>
-</Select>`}
-            >
-              <Select defaultValue="all">
-                <SelectTrigger className="w-52">
-                  <SelectValue placeholder="Pilih X" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All regions</SelectItem>
-                  <SelectItem value="west">West Java</SelectItem>
-                  <SelectItem value="east">East Java</SelectItem>
-                </SelectContent>
-              </Select>
-            </ComponentSection>
-
-            <ComponentSection
               id="checkbox"
               name="Checkbox"
-              description="Unchecked, checked, and disabled states."
-              code={`<Checkbox />
-<Checkbox defaultChecked />
-<Checkbox disabled />`}
+              description="Default, checked, descriptive, disabled, and bordered-card patterns."
+              code={`<CheckboxField id="default" label="Accept terms and conditions" />
+<CheckboxField id="checked" label="Accept terms and conditions" defaultChecked
+  description="By clicking this checkbox, you agree to the terms." />
+<CheckboxField id="disabled" label="Enable notifications" disabled />
+<CheckboxField id="card" label="Enable notifications" card
+  description="You can enable or disable notifications at any time." />`}
             >
-              <Checkbox aria-label="Unchecked" />
-              <Checkbox defaultChecked aria-label="Checked" />
-              <Checkbox disabled aria-label="Disabled" />
-              <span className="text-sm">Accept terms</span>
+              <CheckboxField id="default" label="Accept terms and conditions" />
+              <CheckboxField
+                id="checked"
+                label="Accept terms and conditions"
+                defaultChecked
+                description="By clicking this checkbox, you agree to the terms."
+              />
+              <CheckboxField
+                id="disabled"
+                label="Enable notifications"
+                disabled
+              />
+              <CheckboxField
+                id="card"
+                label="Enable notifications"
+                card
+                description="You can enable or disable notifications at any time."
+              />
             </ComponentSection>
 
             <ComponentSection
@@ -291,16 +317,16 @@ export default function DesignSystemPage() {
               name="Radio group"
               description="Mutually exclusive choices with a visible selected state."
               code={`<RadioGroup defaultValue="grid">
-  <label><RadioGroupItem value="grid" /> Grid view</label>
-  <label><RadioGroupItem value="map" /> Map view</label>
+  <label><RadioGroupItem value="grid" /> Fizi</label>
+  <label><RadioGroupItem value="map" /> Umar</label>
 </RadioGroup>`}
             >
               <RadioGroup className="w-auto gap-3" defaultValue="grid">
                 <label className="flex items-center gap-2 text-sm">
-                  <RadioGroupItem value="grid" /> Grid view
+                  <RadioGroupItem value="grid" /> Fizi
                 </label>
                 <label className="flex items-center gap-2 text-sm">
-                  <RadioGroupItem value="map" /> Map view
+                  <RadioGroupItem value="map" /> Umar
                 </label>
               </RadioGroup>
             </ComponentSection>
@@ -309,32 +335,54 @@ export default function DesignSystemPage() {
               id="alert"
               name="Alert"
               description="Error, warning, info, and success messaging variants."
-              code={`<Alert variant="success"><CheckCircle2 /><AlertTitle>Success</AlertTitle><AlertDescription>Changes saved.</AlertDescription></Alert>
-<Alert variant="error"><X /><AlertTitle>Error</AlertTitle><AlertDescription>Something went wrong.</AlertDescription></Alert>
-<Alert variant="warning">...</Alert>
-<Alert variant="info">...</Alert>`}
+              code={`<Alert variant="success">
+  <AlertIcon className="bg-[#00ad66] text-neutral-0"><CircleCheck /></AlertIcon>
+  <AlertTitle>Success</AlertTitle>
+  <AlertDescription>Changes saved.</AlertDescription>
+  <AlertAction><AlertClose /></AlertAction>
+</Alert>`}
             >
               <Alert variant="error">
-                <X />
+                <AlertIcon className="bg-red">
+                  <CircleX />
+                </AlertIcon>
                 <AlertTitle>Error</AlertTitle>
                 <AlertDescription>Something went wrong.</AlertDescription>
+                <AlertAction>
+                  <AlertClose />
+                </AlertAction>
               </Alert>
               <Alert variant="warning">
-                <Info />
+                <AlertIcon className="text-yellow-600">
+                  <TriangleAlert />
+                </AlertIcon>
                 <AlertTitle>Warning</AlertTitle>
                 <AlertDescription>Please review this item.</AlertDescription>
+                <AlertAction>
+                  <AlertClose />
+                </AlertAction>
               </Alert>
               <Alert variant="info">
-                <Info />
+                <AlertIcon className="text-primary-600">
+                  <CircleAlert   />
+                </AlertIcon>
                 <AlertTitle>Info</AlertTitle>
                 <AlertDescription>
                   New information is available.
                 </AlertDescription>
+                <AlertAction>
+                  <AlertClose />
+                </AlertAction>
               </Alert>
               <Alert variant="success">
-                <CheckCircle2 />
+                <AlertIcon className="text-green-600">
+                  <CircleCheck />
+                </AlertIcon>
                 <AlertTitle>Success</AlertTitle>
                 <AlertDescription>Changes saved.</AlertDescription>
+                <AlertAction>
+                  <AlertClose />
+                </AlertAction>
               </Alert>
             </ComponentSection>
 
@@ -346,29 +394,10 @@ export default function DesignSystemPage() {
             >
               <Accordion className="w-full max-w-lg" defaultValue={["faq"]}>
                 <AccordionItem value="faq">
-                  <AccordionTrigger>Question?</AccordionTrigger>
-                  <AccordionContent>Answer</AccordionContent>
+                  <AccordionTrigger>Does Umar === Fizi?</AccordionTrigger>
+                  <AccordionContent>Yes!</AccordionContent>
                 </AccordionItem>
               </Accordion>
-            </ComponentSection>
-
-            <ComponentSection
-              id="separator"
-              name="Separator"
-              description="Horizontal and vertical content boundaries."
-              code={`<Separator />
-<Separator orientation="vertical" />`}
-            >
-              <div className="w-64">
-                <span className="text-sm">Overview</span>
-                <Separator className="my-4" />
-                <span className="text-sm text-neutral-500">Details</span>
-              </div>
-              <div className="flex h-8 items-center gap-4">
-                <span className="text-sm">Left</span>
-                <Separator orientation="vertical" />
-                <span className="text-sm">Right</span>
-              </div>
             </ComponentSection>
 
             <ComponentSection
@@ -402,58 +431,6 @@ export default function DesignSystemPage() {
                 />
                 <TooltipContent>More information</TooltipContent>
               </Tooltip>
-            </ComponentSection>
-
-            <ComponentSection
-              id="sheet"
-              name="Sheet"
-              description="Side panel for secondary tasks and details."
-              code={`<Sheet><SheetTrigger render={<Button>Open panel</Button>} /><SheetContent><SheetHeader><SheetTitle>Details</SheetTitle></SheetHeader></SheetContent></Sheet>`}
-            >
-              <Sheet>
-                <SheetTrigger
-                  render={<Button variant="secondary">Open panel</Button>}
-                />
-                <SheetContent>
-                  <SheetHeader>
-                    <SheetTitle>Details</SheetTitle>
-                    <SheetDescription>
-                      Review selected tenant information.
-                    </SheetDescription>
-                  </SheetHeader>
-                </SheetContent>
-              </Sheet>
-            </ComponentSection>
-
-            <ComponentSection
-              id="sidebar"
-              name="Sidebar"
-              description="Expanded and collapsed navigation rail states."
-              code={`<SidebarProvider><Sidebar collapsible="icon"><SidebarContent>...</SidebarContent></Sidebar></SidebarProvider>`}
-            >
-              <div className="h-48 w-full max-w-lg overflow-hidden rounded-lg border border-neutral-200">
-                <SidebarProvider className="min-h-0">
-                  <Sidebar collapsible="none" className="w-48 border-r">
-                    <SidebarContent>
-                      <SidebarGroup>
-                        <SidebarGroupLabel>Workspace</SidebarGroupLabel>
-                        <SidebarGroupContent>
-                          <SidebarMenu>
-                            <SidebarMenuItem>
-                              <SidebarMenuButton isActive>
-                                Overview
-                              </SidebarMenuButton>
-                            </SidebarMenuItem>
-                            <SidebarMenuItem>
-                              <SidebarMenuButton>Settings</SidebarMenuButton>
-                            </SidebarMenuItem>
-                          </SidebarMenu>
-                        </SidebarGroupContent>
-                      </SidebarGroup>
-                    </SidebarContent>
-                  </Sidebar>
-                </SidebarProvider>
-              </div>
             </ComponentSection>
           </main>
         </div>

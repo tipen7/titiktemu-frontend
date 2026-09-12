@@ -4,7 +4,7 @@ import { cn } from "cn";
 import { XIcon } from "lucide-react";
 
 const alertVariants = cva(
-  "group/alert relative grid min-h-20 w-[314px] max-w-full grid-cols-[44px_1fr] items-center gap-x-4 gap-y-0 rounded-xl border-0 border-l-[14px] bg-neutral-0 px-4 py-3 text-left font-sans has-data-[slot=alert-action]:pr-10 has-[>svg]:grid-cols-[44px_1fr] *:[svg]:row-span-2 *:[svg]:size-11 *:[svg]:shrink-0 sm:min-h-[92px] sm:gap-x-4 sm:px-4 sm:py-4",
+  "group/alert relative grid min-h-20 w-[314px] max-w-full grid-cols-[44px_1fr] items-center gap-x-4 gap-y-0 rounded-xl border-0 border-l-[14px] bg-neutral-0 px-4 py-3 text-left font-sans has-data-[slot=alert-action]:pr-10 has-[>[data-slot=alert-icon]]:grid-cols-[44px_1fr] sm:min-h-[92px] sm:gap-x-4 sm:px-4 sm:py-4",
   {
     variants: {
       variant: {
@@ -71,6 +71,19 @@ function AlertDescription({
   );
 }
 
+function AlertIcon({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="alert-icon"
+      className={cn(
+        "col-start-1 row-span-2 row-start-1 flex size-11 shrink-0 items-center justify-center rounded-full [&>svg]:size-10 [&>svg]:shrink-0",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
 function AlertAction({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -98,4 +111,11 @@ function AlertClose({ className, ...props }: React.ComponentProps<"button">) {
   );
 }
 
-export { Alert, AlertTitle, AlertDescription, AlertAction, AlertClose };
+export {
+  Alert,
+  AlertTitle,
+  AlertDescription,
+  AlertAction,
+  AlertClose,
+  AlertIcon,
+};

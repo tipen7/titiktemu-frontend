@@ -1,19 +1,25 @@
 "use client";
 
+import { useEffect } from "react";
 import type { LatLngExpression } from "leaflet";
-import { MapContainer, TileLayer, useMapEvent } from "react-leaflet";
+import { MapContainer, TileLayer, useMap, useMapEvent } from "react-leaflet";
 
 const STUDY_AREA_CENTER: LatLngExpression = [-6.216, 106.811];
 
 export function LeafletMap({
   center = STUDY_AREA_CENTER,
   zoom = 14,
+  flyTo,
   className,
   children,
   onClick,
 }: {
   center?: LatLngExpression;
   zoom?: number;
+  /** Pans/zooms the already-mounted map when this changes -- `center` above
+   * only sets the INITIAL view (react-leaflet doesn't re-pan on prop change
+   * after mount). Use this for "click a list item, map flies there." */
+  flyTo?: { lat: number; lng: number; zoom?: number } | null;
   className?: string;
   children?: React.ReactNode;
   onClick?: (lat: number, lng: number) => void;
@@ -30,9 +36,22 @@ export function LeafletMap({
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       {onClick && <MapClickHandler onClick={onClick} />}
+      {flyTo && <FlyToLocation lat={flyTo.lat} lng={flyTo.lng} zoom={flyTo.zoom} />}
       {children}
     </MapContainer>
   );
+}
+
+function FlyToLocation({ lat, lng, zoom }: { lat: number; lng: number; zoom?: number }) {
+  const map = useMap();
+  useEffect(() => {
+    map.flyTo([lat, lng], zoom ?? map.getZoom(), { duration: 0.75 });
+    // Only re-run when the target itself changes -- including `map`/`zoom`
+    // in deps would re-trigger the animation on every zoom/pan the user
+    // does themselves.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lat, lng]);
+  return null;
 }
 
 function MapClickHandler({

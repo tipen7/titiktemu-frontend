@@ -13,6 +13,8 @@ import {
   SelectValue,
 } from "@/app/components/ui/select";
 import { AiPanel } from "@/app/components/modules/ai-panel";
+import { MapLegend } from "@/app/components/map/map-legend";
+import { useCurrentLocation } from "@/app/hooks/use-current-location";
 import { useGrid } from "@/app/hooks/use-grid";
 import { useModelAccuracy } from "@/app/hooks/use-model-accuracy";
 import { useZoneLookup } from "@/app/hooks/use-zone-lookup";
@@ -29,6 +31,10 @@ const GeoJsonLayer = dynamic(
   () => import("@/app/components/map/geojson-layer").then((mod) => mod.GeoJsonLayer),
   { ssr: false },
 );
+const CurrentLocationMarker = dynamic(
+  () => import("@/app/components/map/current-location-marker").then((mod) => mod.CurrentLocationMarker),
+  { ssr: false },
+);
 
 const ZONE_BADGE_VARIANT: Record<ZoneLabel, "secondary" | "default" | "primary"> = {
   aman: "secondary",
@@ -41,13 +47,14 @@ type Mode = "umkm" | "operator";
 export default function Home() {
   const [mode, setMode] = useState<Mode>("umkm");
   const [clickedLocation, setClickedLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [selectedUmkmId, setSelectedUmkmId] = useState<string | null>(null);
   const [priceSortAsc, setPriceSortAsc] = useState(false);
   const [safeOnly, setSafeOnly] = useState(false);
   const [search, setSearch] = useState("");
 
   const { data: grid, isLoading: isGridLoading } = useGrid();
   const { data: modelAccuracy } = useModelAccuracy();
-  const { data: zone, isLoading: isZoneLoading } = useZoneLookup(clickedLocation);
+  const { location: currentLocation } = useCurrentLocation();
 
   const { data: umkmResult, isLoading: isUmkmLoading } = useUmkm({
     search: search || undefined,
@@ -58,6 +65,12 @@ export default function Home() {
     if (!priceSortAsc) return 0;
     return (a.reference_price_per_txn_idr ?? Infinity) - (b.reference_price_per_txn_idr ?? Infinity);
   });
+  const selectedUmkm = umkmList.find((u) => u.id === selectedUmkmId) ?? null;
+
+  const activeLocation = selectedUmkm
+    ? { lat: selectedUmkm.latitude, lng: selectedUmkm.longitude }
+    : clickedLocation;
+  const { data: zone, isLoading: isZoneLoading } = useZoneLookup(activeLocation);
 
   const { data: summary } = useDashboardSummary();
   const { data: recommendations } = usePolicy();
@@ -87,10 +100,20 @@ export default function Home() {
       <div className="flex flex-col gap-4 lg:flex-row">
         <div className="relative flex-1">
           {!isGridLoading && (
-            <LeafletMap onClick={(lat, lng) => setClickedLocation({ lat, lng })}>
+            <LeafletMap
+              onClick={(lat, lng) => {
+                setSelectedUmkmId(null);
+                setClickedLocation({ lat, lng });
+              }}
+              flyTo={selectedUmkm ? { lat: selectedUmkm.latitude, lng: selectedUmkm.longitude, zoom: 16 } : null}
+            >
               <GeoJsonLayer data={grid} modelAccuracy={modelAccuracy} />
+              {currentLocation && (
+                <CurrentLocationMarker lat={currentLocation.lat} lng={currentLocation.lng} />
+              )}
             </LeafletMap>
           )}
+          <MapLegend />
           <AiPanel role={mode === "operator" ? "operator" : "umkm"} />
         </div>
 
@@ -126,8 +149,11 @@ export default function Home() {
               </button>
             </div>
 
-            {clickedLocation && (
+            {activeLocation && (
               <div className="rounded-xl border border-border p-3">
+                {selectedUmkm && (
+                  <p className="mb-2 text-b9 font-semibold text-neutral-900">{selectedUmkm.name}</p>
+                )}
                 {isZoneLoading && <Skeleton className="h-16 w-full" />}
                 {!isZoneLoading && zone && (
                   <div className="flex flex-col gap-1">
@@ -154,7 +180,18 @@ export default function Home() {
               )}
               {!isUmkmLoading &&
                 umkmList.map((umkm) => (
-                  <div key={umkm.id} className="flex items-center gap-3 rounded-xl border border-border p-3">
+                  <button
+                    key={umkm.id}
+                    type="button"
+                    onClick={() => {
+                      setClickedLocation(null);
+                      setSelectedUmkmId(umkm.id);
+                    }}
+                    aria-pressed={selectedUmkmId === umkm.id}
+                    className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-colors hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 ${
+                      selectedUmkmId === umkm.id ? "border-primary-500 bg-primary-50" : "border-border"
+                    }`}
+                  >
                     <div className="flex-1">
                       <p className="text-b9 font-semibold text-neutral-900">{umkm.name ?? "-"}</p>
                       <p className="text-b9 text-neutral-500">
@@ -166,7 +203,7 @@ export default function Home() {
                     {umkm.zone_label && (
                       <Badge variant={ZONE_BADGE_VARIANT[umkm.zone_label]}>{umkm.zone_label.toUpperCase()}</Badge>
                     )}
-                  </div>
+                  </button>
                 ))}
             </div>
           </aside>

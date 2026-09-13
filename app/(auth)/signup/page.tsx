@@ -25,7 +25,6 @@ export default function SignUpPage() {
   const [role, setRole] = useState<UserRole>("umkm");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSubmitted, setIsSubmitted] = useState(false);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -41,48 +40,70 @@ export default function SignUpPage() {
     }
 
     setIsSubmitting(true);
-    const { data, error: signUpError } = await createClient().auth.signUp({
+    const supabase = createClient();
+    const { data, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { role, full_name: fullName } },
     });
-    setIsSubmitting(false);
 
     if (signUpError) {
-      setError(signUpError.message);
+      setIsSubmitting(false);
+      if (
+        signUpError.status === 429 ||
+        signUpError.message.toLowerCase().includes("rate limit") ||
+        signUpError.message.toLowerCase().includes("too many requests") ||
+        signUpError.message.toLowerCase().includes("over_email_send_rate_limit")
+      ) {
+        setError(
+          "Terlalu banyak percobaan pendaftaran dalam waktu singkat (Rate Limit). Silakan tunggu beberapa saat atau coba masuk jika akun sudah terdaftar.",
+        );
+      } else {
+        setError(signUpError.message);
+      }
       return;
     }
 
-    // With email confirmation on, Supabase returns a user but no session --
-    // there's nothing to redirect into yet, so show a "check your email"
-    // state instead of silently doing nothing.
-    if (!data.session) {
-      setIsSubmitted(true);
+    // If session is already created (email confirmation disabled in Supabase),
+    // redirect directly to beranda.
+    if (data.session) {
+      setIsSubmitting(false);
+      router.push("/beranda/");
+      router.refresh();
       return;
     }
 
-    router.push("/beranda/");
-    router.refresh();
-  }
+    // If no session returned (e.g. email confirmation setting still active on project),
+    // attempt one graceful login fallback.
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-  if (isSubmitted) {
-    return (
-      <AuthShell>
-        <h1 className="mb-3 font-sans text-[36px] font-bold leading-[40px] text-neutral-900">
-          Cek Email Anda
-        </h1>
-        <p className="font-sans text-[20px] leading-[28px] text-neutral-700">
-          Kami telah mengirim tautan konfirmasi ke {email}. Buka email
-          tersebut untuk mengaktifkan akun Anda.
-        </p>
-        <Link
-          href="/login"
-          className="mt-6 inline-block font-sans text-b7 font-semibold text-primary-600 hover:underline"
-        >
-          Kembali ke halaman masuk
-        </Link>
-      </AuthShell>
-    );
+    setIsSubmitting(false);
+
+    if (signInError) {
+      if (
+        signInError.status === 429 ||
+        signInError.message.toLowerCase().includes("rate limit") ||
+        signInError.message.toLowerCase().includes("too many requests")
+      ) {
+        setError(
+          "Pendaftaran berhasil dibuat, namun server membatasi frekuensi login (429). Silakan coba masuk melalui halaman Login.",
+        );
+      } else {
+        // Redirect to login page if email confirmation is still required by supabase project
+        router.push("/login");
+      }
+      return;
+    }
+
+    if (signInData.session) {
+      router.push("/beranda/");
+      router.refresh();
+    } else {
+      router.push("/login");
+    }
   }
 
   return (

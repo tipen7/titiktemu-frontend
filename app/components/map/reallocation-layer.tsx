@@ -4,7 +4,7 @@ import { CircleMarker, Polyline, Popup } from "react-leaflet";
 import { ConfidenceBadge } from "@/app/components/ui/confidence-badge";
 import type { ModelAccuracy, ReallocationCandidate } from "@/app/types/zones";
 
-function centroidOf(coordinates: number[][]): [number, number] {
+export function centroidOf(coordinates: number[][]): [number, number] {
   const [lngSum, latSum] = coordinates.reduce<[number, number]>(
     (sum, [lng, lat]) => [sum[0] + (lng ?? 0), sum[1] + (lat ?? 0)],
     [0, 0],

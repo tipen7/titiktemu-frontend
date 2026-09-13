@@ -11,6 +11,17 @@ const GUEST_ONLY_PATHS = ["/login", "/signup", "/forgot-password"];
 // guest-only pages above, but it also isn't gated behind a full login.
 const ALWAYS_ACCESSIBLE_PATHS = ["/reset-password"];
 
+// UMKM accounts only get Beranda, UMKM Self-Tracker, and Profil Usaha (per
+// product decision) -- everything else under the (app) shell is operator/
+// admin-only. Enforced here (not just hidden in the sidebar) so typing the
+// URL directly doesn't bypass the restriction.
+const UMKM_RESTRICTED_PREFIXES = [
+  "/esg-dashboard",
+  "/report-allocation",
+  "/tenant-matching",
+  "/discovery-map"
+];
+
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -53,6 +64,16 @@ export async function proxy(request: NextRequest) {
   }
 
   if (user && isGuestOnlyPath) {
+    return NextResponse.redirect(new URL("/beranda/", request.url));
+  }
+
+  const role = user?.user_metadata?.role as string | undefined;
+  const isUmkmRestrictedPath = UMKM_RESTRICTED_PREFIXES.some(
+    (prefix) =>
+      request.nextUrl.pathname === prefix ||
+      request.nextUrl.pathname.startsWith(`${prefix}/`),
+  );
+  if (role === "umkm" && isUmkmRestrictedPath) {
     return NextResponse.redirect(new URL("/beranda/", request.url));
   }
 

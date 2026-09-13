@@ -45,6 +45,53 @@
   --text-b9: 0.75rem;
   --text-b9--line-height: 1.45;
   --text-b9--font-weight: 400;
+  /* --text-fig-* below are sourced verbatim from the "Beranda" (Operator)
+     Figma frame (node 15004:4798) -- they don't reuse the h5/h6/s6-s9
+     tokens above because those are already relied on by other pages at
+     different sizes/weights than this frame's H5/H6/SH4/SH6/SH7/SH9
+     styles, and this pass only audited this one frame against Figma. */
+  --text-fig-h5: 1.5rem;
+  --text-fig-h5--line-height: 1.3333;
+  --text-fig-h5--font-weight: 700;
+  --text-fig-h6: 1.25rem;
+  --text-fig-h6--line-height: 1.4;
+  --text-fig-h6--font-weight: 700;
+  --text-fig-sh4: 1.875rem;
+  --text-fig-sh4--line-height: 1.2;
+  --text-fig-sh4--font-weight: 600;
+  --text-fig-sh5: 1.5rem;
+  --text-fig-sh5--line-height: 1.3333;
+  --text-fig-sh5--font-weight: 600;
+  --text-fig-b6: 1.25rem;
+  --text-fig-b6--line-height: 1.4;
+  --text-fig-b6--font-weight: 400;
+  --text-fig-sh6: 1.25rem;
+  --text-fig-sh6--line-height: 1.4;
+  --text-fig-sh6--font-weight: 600;
+  --text-fig-sh7: 1rem;
+  --text-fig-sh7--line-height: 1.5;
+  --text-fig-sh7--font-weight: 600;
+  --text-fig-sh8: 0.875rem;
+  --text-fig-sh8--line-height: 1.4286;
+  --text-fig-sh8--font-weight: 600;
+  --text-fig-sh9: 0.75rem;
+  --text-fig-sh9--line-height: 1.3333;
+  --text-fig-sh9--font-weight: 600;
+  --text-fig-b10: 0.625rem;
+  --text-fig-b10--line-height: 1.2;
+  --text-fig-b10--font-weight: 400;
+  --color-behavior-red-10: var(--behavior-red-10);
+  --color-behavior-red-20: var(--behavior-red-20);
+  --color-behavior-red-30: var(--behavior-red-30);
+  --color-behavior-green-10: var(--behavior-green-10);
+  --color-behavior-green-20: var(--behavior-green-20);
+  --color-behavior-green-30: var(--behavior-green-30);
+  --color-behavior-yellow-10: var(--behavior-yellow-10);
+  --color-behavior-yellow-20: var(--behavior-yellow-20);
+  --color-behavior-yellow-30: var(--behavior-yellow-30);
+  --color-primary-teal-20: var(--primary-teal-20);
+  --color-primary-teal-60: var(--primary-teal-60);
+  --color-primary-teal-70: var(--primary-teal-70);
   --color-primary-50: var(--primary-50);
   --color-primary-100: var(--primary-100);
   --color-primary-200: var(--primary-200);
@@ -152,6 +199,22 @@
   --neutral-800: #262b2c;
   --neutral-900: #171b1c;
   --neutral-1000: #0d1111;
+  /* Colors below have no equivalent in the primary/secondary/neutral ramps
+     above -- sourced verbatim from Figma node 15004:4798's "behavior/*"
+     and "primary-teal/*" variables (risk-status semantics: red/green/yellow
+     aren't covered by this project's primary-teal/secondary-green scale). */
+  --behavior-red-10: #faefee;
+  --behavior-red-20: #d90e10;
+  --behavior-red-30: #8d0000;
+  --behavior-green-10: #e7f5f0;
+  --behavior-green-20: #00a85e;
+  --behavior-green-30: #006836;
+  --behavior-yellow-10: #fbf2e6;
+  --behavior-yellow-20: #ff9600;
+  --behavior-yellow-30: #894d00;
+  --primary-teal-20: #d5f5f7;
+  --primary-teal-60: #00aaaa;
+  --primary-teal-70: #008a8b;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);

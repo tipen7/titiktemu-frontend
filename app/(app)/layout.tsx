@@ -1,5 +1,6 @@
 import { AppSidebar } from "@/app/components/ui/app-sidebar";
 import { SidebarProvider, SidebarTrigger } from "@/app/components/ui/sidebar";
+import { ModeHeader } from "@/app/components/layout/mode-header";
 
 export default function AppShellLayout({
   children,
@@ -9,10 +10,10 @@ export default function AppShellLayout({
   return (
     <SidebarProvider>
       <AppSidebar />
-      <main className="flex-1">
-        <SidebarTrigger />
-        {children}
-      </main>
+      <div className="flex flex-1 flex-col min-w-0">
+        <ModeHeader />
+        <main className="flex-1 overflow-auto">{children}</main>
+      </div>
     </SidebarProvider>
   );
 }

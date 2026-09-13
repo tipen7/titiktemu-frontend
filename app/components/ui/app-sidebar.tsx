@@ -8,9 +8,9 @@ import {
   Home,
   LogOut,
   Map,
-  MapPinned,
-  PaletteIcon,
+  UserRound,
   UsersRound,
+  type LucideIcon,
 } from "lucide-react";
 import { useAuth, type UserRole } from "@/app/lib/auth";
 import { Button } from "./button";
@@ -33,32 +33,64 @@ const ROLE_LABELS: Record<UserRole, string> = {
   public_user: "Pengguna",
 };
 
-const navigationItems = [
-  { label: "Beranda", href: "/beranda/", icon: Home },
+type NavigationItem = {
+  label: string;
+  href: string;
+  icon: LucideIcon;
+  roles: readonly UserRole[];
+};
+
+const navigationItems: readonly NavigationItem[] = [
+  {
+    label: "Beranda",
+    href: "/beranda/",
+    icon: Home,
+    roles: ["umkm", "operator_tod", "pemda_admin", "public_user"],
+  },
   {
     label: "UMKM Self-Tracker",
     href: "/umkm-self-tracker/",
     icon: FilePenLine,
+    roles: ["umkm", "operator_tod", "pemda_admin"],
+  },
+  {
+    label: "Profil Usaha",
+    href: "/profil-usaha/",
+    icon: UserRound,
+    roles: ["umkm"],
   },
   {
     label: "ESG Dashboard",
     href: "/esg-dashboard/",
     icon: FileChartColumnIncreasing,
+    roles: ["operator_tod", "pemda_admin"],
   },
   {
     label: "Laporan Alokasi",
     href: "/report-allocation/",
     icon: FileChartColumnIncreasing,
+    roles: ["operator_tod", "pemda_admin"],
   },
-  { label: "Tenant Matching", href: "/tenant-matching/", icon: UsersRound },
-  { label: "Discovery Map", href: "/discovery-map/", icon: Map },
-  { label: "Design System", href: "/design-system/", icon: PaletteIcon },
-] as const;
+  {
+    label: "Tenant Matching",
+    href: "/tenant-matching/",
+    icon: UsersRound,
+    roles: ["operator_tod", "pemda_admin"],
+  },
+  {
+    label: "Discovery Map",
+    href: "/discovery-map/",
+    icon: Map,
+    roles: ["operator_tod", "pemda_admin"],
+  },
+];
 
 export function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, role, signOut } = useAuth();
+
+  const currentRole = role ?? "umkm";
 
   return (
     <Sidebar collapsible="icon" className="border-r-0 bg-neutral-50">
@@ -67,11 +99,8 @@ export function AppSidebar() {
           href="/beranda/"
           className="flex items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-primary-300 group-data-[collapsible=icon]:justify-center"
         >
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary-700 text-neutral-0">
-            <MapPinned className="size-7" strokeWidth={1.8} />
-          </span>
-          <span className="font-sans text-h6 font-semibold tracking-tight text-secondary-800 group-data-[collapsible=icon]:hidden">
-            TitikTemu
+          <span className="flex size-15 shrink-0 items-center justify-center rounded-lg text-neutral-0">
+            <img src="./titiktemu.png" className="w-[128px]"/>
           </span>
         </Link>
       </SidebarHeader>
@@ -79,7 +108,9 @@ export function AppSidebar() {
         <SidebarGroup className="px-4 py-0 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2">
           <SidebarGroupContent className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
             <SidebarMenu className="gap-8 group-data-[collapsible=icon]:items-center">
-              {navigationItems.map(({ label, href, icon: Icon }) => {
+              {navigationItems
+                .filter((item) => item.roles.includes(currentRole))
+                .map(({ label, href, icon: Icon }) => {
                 const isActive = pathname === href || pathname.startsWith(href);
 
                 return (

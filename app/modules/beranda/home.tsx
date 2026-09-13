@@ -7,7 +7,9 @@ import { Badge } from "@/app/components/ui/badge";
 import { Input } from "@/app/components/ui/input";
 import { Skeleton } from "@/app/components/ui/skeleton";
 import { AiPanel } from "@/app/components/modules/ai-panel";
+import { MapLegend } from "@/app/components/map/map-legend";
 import { useAuth } from "@/app/lib/auth";
+import { useCurrentLocation } from "@/app/hooks/use-current-location";
 import { useGrid } from "@/app/hooks/use-grid";
 import { useModelAccuracy } from "@/app/hooks/use-model-accuracy";
 import { useZoneLookup } from "@/app/hooks/use-zone-lookup";
@@ -23,6 +25,10 @@ const LeafletMap = dynamic(
 );
 const GeoJsonLayer = dynamic(
   () => import("@/app/components/map/geojson-layer").then((mod) => mod.GeoJsonLayer),
+  { ssr: false },
+);
+const CurrentLocationMarker = dynamic(
+  () => import("@/app/components/map/current-location-marker").then((mod) => mod.CurrentLocationMarker),
   { ssr: false },
 );
 
@@ -62,6 +68,7 @@ export default function Home() {
 
   const { data: grid, isLoading: isGridLoading } = useGrid();
   const { data: modelAccuracy } = useModelAccuracy();
+  const { location: currentLocation } = useCurrentLocation();
   const { data: zone, isLoading: isZoneLoading } = useZoneLookup(clickedLocation);
 
   const { data: umkmResult, isLoading: isUmkmLoading } = useUmkm({
@@ -95,184 +102,195 @@ export default function Home() {
         </div>
         <div className="flex items-center gap-2 rounded-lg border border-border bg-neutral-0 px-3 py-2">
           <span className="size-8 shrink-0 rounded-full bg-secondary-100" aria-hidden="true" />
-          <div className="flex flex-col leading-tight">
-            <span className="text-b9 font-semibold text-neutral-900">
-              {user?.user_metadata?.full_name ?? user?.email ?? "Pengguna"}
-            </span>
-            <span className="text-b9 text-neutral-500">
-              {mode === "operator" ? "Mode Operator" : "Mode UMKM"}
-            </span>
-          </div>
+          <span className="text-b9 font-semibold text-neutral-900">
+            {user?.user_metadata?.full_name ?? user?.email ?? "Pengguna"}
+          </span>
         </div>
       </header>
 
       <div className="flex flex-col gap-4 lg:flex-row">
-        <div className="relative flex-1 overflow-hidden rounded-xl">
+        <div className="relative max-h-[768px] flex-1 overflow-hidden rounded-xl">
           {!isGridLoading && (
             <LeafletMap
+              className="h-full w-full rounded-xl"
               onClick={(lat, lng) => {
-                setClickedLocation({ lat, lng });
                 setSelectedUmkmId(null);
+                setClickedLocation({ lat, lng });
               }}
+              flyTo={selectedUmkm ? { lat: selectedUmkm.latitude, lng: selectedUmkm.longitude, zoom: 16 } : null}
             >
               <GeoJsonLayer data={grid} modelAccuracy={modelAccuracy} />
+              {currentLocation && (
+                <CurrentLocationMarker lat={currentLocation.lat} lng={currentLocation.lng} />
+              )}
             </LeafletMap>
           )}
+          <MapLegend />
           <AiPanel role={mode === "operator" ? "operator" : "umkm"} />
         </div>
 
         {mode === "umkm" ? (
-          <aside className="flex w-full shrink-0 flex-col gap-3 lg:w-80">
-            <h2 className="text-s6 font-semibold text-neutral-900">Temukan UMKM Favoritmu!</h2>
-            <Input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Cari Jasa/Barang"
-              aria-label="Cari UMKM"
-            />
-            <div className="flex flex-wrap gap-2">
-              <Badge
-                variant="secondary"
-                selected={safeOnly}
-                onSelectedChange={setSafeOnly}
-                className="h-8 min-w-0 px-4 text-b9"
-              >
-                Zona Aman
-              </Badge>
-              <Badge
-                variant="primary"
-                selected={affordableOnly}
-                onSelectedChange={setAffordableOnly}
-                className="h-8 min-w-0 px-4 text-b9"
-              >
-                Harga Terjangkau
-              </Badge>
-            </div>
-
-            {selectedUmkm ? (
-              <UmkmDetailCard umkm={selectedUmkm} onClose={() => setSelectedUmkmId(null)} />
-            ) : (
-              clickedLocation && (
-                <div className="rounded-xl border border-border p-3">
-                  {isZoneLoading && <Skeleton className="h-16 w-full" />}
-                  {!isZoneLoading && zone && (
-                    <div className="flex flex-col gap-1">
-                      <Badge variant={ZONE_BADGE_VARIANT[zone.zone_label]} selectable={false}>
-                        {zone.zone_label.toUpperCase()}
-                      </Badge>
-                      <p className="text-b9 text-neutral-600">
-                        Grid {zone.grid_id} &middot; {zone.district_name ?? "-"}
-                      </p>
-                      <p className="text-b9 text-neutral-600">
-                        Indeks kerentanan: {zone.vulnerability_index.toFixed(3)}
-                      </p>
-                    </div>
-                  )}
-                  {!isZoneLoading && !zone && (
-                    <p className="text-b9 text-neutral-500">Lokasi ini di luar area studi.</p>
-                  )}
-                </div>
-              )
-            )}
-
-            <div className="flex flex-col gap-2">
-              <span className="text-b9 font-semibold text-neutral-500">Hasil Pencarian</span>
-              {isUmkmLoading &&
-                Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
-              {!isUmkmLoading && umkmList.length === 0 && (
-                <p className="text-b9 text-neutral-500">Tidak ada UMKM yang cocok.</p>
-              )}
-              {!isUmkmLoading &&
-                umkmList.map((umkm) => (
-                  <button
-                    key={umkm.id}
-                    type="button"
-                    onClick={() => setSelectedUmkmId(umkm.id)}
-                    className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-colors hover:bg-neutral-50 ${
-                      umkm.id === selectedUmkmId ? "border-primary-500 bg-primary-50" : "border-border"
-                    }`}
-                  >
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-secondary-100 text-b9 font-semibold text-secondary-700">
-                      {(umkm.name ?? "?").charAt(0).toUpperCase()}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-b9 font-semibold text-neutral-900">{umkm.name ?? "-"}</p>
-                      <p className="truncate text-b9 text-neutral-500">
-                        {umkm.dist_to_station_m !== null
-                          ? `${Math.round(umkm.dist_to_station_m)}m dari stasiun`
-                          : (umkm.district_name ?? "-")}
-                      </p>
-                    </div>
-                  </button>
-                ))}
-            </div>
-          </aside>
-        ) : (
-          <aside className="flex w-full shrink-0 flex-col gap-4 lg:w-80">
-            <h2 className="text-s6 font-semibold text-neutral-900">Panel Informasi</h2>
+          <aside className="flex w-95 shrink-0 flex-col gap-7 bg-neutral-0 pt-2 pb-6 px-4">
+            <h2 className="text-fig-h5 text-neutral-900">Panel Informasi</h2>
+            <div className="h-px w-full shrink-0 bg-neutral-200" />
 
             {summary && (
-              <div className="rounded-xl border border-border p-4">
-                <p className="text-b9 text-neutral-500">Matching Score</p>
-                <div className="mt-1 flex items-baseline gap-2">
-                  <span className="text-h5 font-bold text-primary-700">
+              <div className="flex shrink-0 flex-col gap-3">
+                <p className="text-fig-sh6 text-neutral-900">Matching Score</p>
+                <div className="flex items-center gap-3">
+                  <span className="text-fig-sh4 text-primary-teal-70">
                     {Math.round(summary.avg_matching_score)}% Match
                   </span>
-                  <Badge variant="secondary" selectable={false} className="h-6 min-w-0 px-3 text-b9">
+                  <span className="rounded-xl bg-primary-teal-60 px-3 py-1 text-fig-sh9 text-neutral-0">
                     {matchingTier(summary.avg_matching_score)}
-                  </Badge>
+                  </span>
                 </div>
-                <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-neutral-100">
+                <div className="h-2 w-full overflow-hidden rounded-full bg-primary-teal-20">
                   <div
-                    className="h-full rounded-full bg-primary-500"
+                    className="h-full rounded-full bg-primary-teal-60"
                     style={{ width: `${Math.min(100, Math.max(0, summary.avg_matching_score))}%` }}
                   />
                 </div>
               </div>
             )}
 
+            <div className="h-px w-full shrink-0 bg-neutral-200" />
+
             {summary && (
-              <div className="rounded-xl border border-border p-4">
-                <p className="mb-2 text-b9 text-neutral-500">Status Tiap Zona</p>
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div>
-                    <p className="text-s6 font-semibold text-primary-700">{zonaRawanPct}% Area</p>
-                    <p className="text-b9 text-neutral-500">Zona Rawan</p>
+              <div className="flex shrink-0 flex-col gap-3">
+                <p className="text-fig-sh6 text-neutral-900">Status Tiap Zona</p>
+                <div className="flex items-center gap-3">
+                  <div className="min-w-0 flex-1 rounded-xl border border-neutral-200 bg-neutral-0 p-4 shadow-[0_4px_4px_rgba(0,0,0,0.02)]">
+                    <p className="text-b8 text-neutral-500">Zona Rawan</p>
+                    <p className="text-fig-sh6 text-behavior-red-30">{zonaRawanPct}% Area</p>
                   </div>
-                  <div>
-                    <p className="text-s6 font-semibold text-secondary-700">{zonaAmanPct}% Area</p>
-                    <p className="text-b9 text-neutral-500">Zona Aman</p>
+                  <div className="min-w-0 flex-1 rounded-xl border border-neutral-200 bg-neutral-0 p-4 shadow-[0_4px_4px_rgba(0,0,0,0.02)]">
+                    <p className="text-b8 text-neutral-500">Zona Aman</p>
+                    <p className="text-fig-sh6 text-behavior-green-30">{zonaAmanPct}% Area</p>
                   </div>
-                  <div>
-                    <p className="text-s6 font-semibold text-neutral-900">{zonaWaspadaPct}% Area</p>
-                    <p className="text-b9 text-neutral-500">Zona Waspada</p>
+                  <div className="min-w-0 flex-1 rounded-xl border border-neutral-200 bg-neutral-0 p-4 shadow-[0_4px_4px_rgba(0,0,0,0.02)]">
+                    <p className="text-b8 text-neutral-500">Zona Waspada</p>
+                    <p className="text-fig-sh6 text-behavior-yellow-30">{zonaWaspadaPct}% Area</p>
                   </div>
                 </div>
               </div>
             )}
 
-            <div className="flex flex-col gap-2">
-              <p className="text-b9 font-semibold text-neutral-500">Rekomendasi Alokasi</p>
+            <div className="h-px w-full shrink-0 bg-neutral-200" />
+
+            <div className="flex flex-col gap-3">
+              <p className="text-fig-h6 text-neutral-900">Rekomendasi Alokasi</p>
               {!recommendations?.length && (
                 <p className="text-b9 text-neutral-500">Belum ada rekomendasi tersedia.</p>
               )}
-              {recommendations?.slice(0, 3).map((item) => (
-                <div key={item.grid_id} className="rounded-xl border border-border p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-b9 font-semibold text-neutral-900">
-                      {item.district_name ?? item.grid_id}
-                    </p>
-                    <Badge
-                      variant={item.recommendation_type === "realokasi" ? "primary" : "secondary"}
-                      selectable={false}
-                      className="h-6 min-w-0 shrink-0 px-3 text-b9"
+              <div className="no-scrollbar flex max-h-[420px] flex-col gap-4 overflow-y-auto">
+                {recommendations?.slice(0, 3).map((item) => {
+                  const riskStyle =
+                    item.recommendation_type === "realokasi"
+                      ? "bg-behavior-red-20 text-behavior-red-10"
+                      : item.recommendation_type === "pemantauan"
+                        ? "bg-behavior-green-20 text-behavior-green-10"
+                        : "bg-behavior-yellow-20 text-behavior-yellow-10";
+                  return (
+                    <div
+                      key={item.grid_id}
+                      className="flex shrink-0 flex-col gap-1 rounded-xl bg-primary-50 p-5 shadow-[4px_4px_4px_rgba(0,0,0,0.04)]"
                     >
-                      {RECOMMENDATION_LABEL[item.recommendation_type] ?? item.recommendation_type}
-                    </Badge>
-                  </div>
-                  <p className="mt-1 line-clamp-3 text-b9 text-neutral-600">{item.narrative}</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-fig-sh7 text-neutral-900">
+                          {item.district_name ?? item.grid_id}
+                        </p>
+                        <span className={`shrink-0 rounded-[20px] px-3 py-1 text-fig-sh9 ${riskStyle}`}>
+                          {RECOMMENDATION_LABEL[item.recommendation_type] ?? item.recommendation_type}
+                        </span>
+                      </div>
+                      <p className="text-b7 text-neutral-900">{item.narrative}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </aside>
+        ) : (
+          <aside className="flex w-95 shrink-0 flex-col gap-7 bg-neutral-0 pt-2 pb-6 px-4">
+            <h2 className="text-fig-h5 text-neutral-900">Panel Informasi</h2>
+            <div className="h-px w-full shrink-0 bg-neutral-200" />
+
+            {summary && (
+              <div className="flex shrink-0 flex-col gap-3">
+                <p className="text-fig-sh6 text-neutral-900">Matching Score</p>
+                <div className="flex items-center gap-3">
+                  <span className="text-fig-sh4 text-primary-teal-70">
+                    {Math.round(summary.avg_matching_score)}% Match
+                  </span>
+                  <span className="rounded-xl bg-primary-teal-60 px-3 py-1 text-fig-sh9 text-neutral-0">
+                    {matchingTier(summary.avg_matching_score)}
+                  </span>
                 </div>
-              ))}
+                <div className="h-2 w-full overflow-hidden rounded-full bg-primary-teal-20">
+                  <div
+                    className="h-full rounded-full bg-primary-teal-60"
+                    style={{ width: `${Math.min(100, Math.max(0, summary.avg_matching_score))}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="h-px w-full shrink-0 bg-neutral-200" />
+
+            {summary && (
+              <div className="flex shrink-0 flex-col gap-3">
+                <p className="text-fig-sh6 text-neutral-900">Status Tiap Zona</p>
+                <div className="flex items-center gap-3">
+                  <div className="min-w-0 flex-1 rounded-xl border border-neutral-200 bg-neutral-0 p-4 shadow-[0_4px_4px_rgba(0,0,0,0.02)]">
+                    <p className="text-b8 text-neutral-500">Zona Rawan</p>
+                    <p className="text-fig-sh6 text-behavior-red-30">{zonaRawanPct}% Area</p>
+                  </div>
+                  <div className="min-w-0 flex-1 rounded-xl border border-neutral-200 bg-neutral-0 p-4 shadow-[0_4px_4px_rgba(0,0,0,0.02)]">
+                    <p className="text-b8 text-neutral-500">Zona Aman</p>
+                    <p className="text-fig-sh6 text-behavior-green-30">{zonaAmanPct}% Area</p>
+                  </div>
+                  <div className="min-w-0 flex-1 rounded-xl border border-neutral-200 bg-neutral-0 p-4 shadow-[0_4px_4px_rgba(0,0,0,0.02)]">
+                    <p className="text-b8 text-neutral-500">Zona Waspada</p>
+                    <p className="text-fig-sh6 text-behavior-yellow-30">{zonaWaspadaPct}% Area</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="h-px w-full shrink-0 bg-neutral-200" />
+
+            <div className="flex flex-col gap-3">
+              <p className="text-fig-h6 text-neutral-900">Rekomendasi Alokasi</p>
+              {!recommendations?.length && (
+                <p className="text-b9 text-neutral-500">Belum ada rekomendasi tersedia.</p>
+              )}
+              <div className="no-scrollbar flex max-h-[420px] flex-col gap-4 overflow-y-auto">
+                {recommendations?.slice(0, 3).map((item) => {
+                  const riskStyle =
+                    item.recommendation_type === "realokasi"
+                      ? "bg-behavior-red-20 text-behavior-red-10"
+                      : item.recommendation_type === "pemantauan"
+                        ? "bg-behavior-green-20 text-behavior-green-10"
+                        : "bg-behavior-yellow-20 text-behavior-yellow-10";
+                  return (
+                    <div
+                      key={item.grid_id}
+                      className="flex shrink-0 flex-col gap-1 rounded-xl bg-primary-50 p-5 shadow-[4px_4px_4px_rgba(0,0,0,0.04)]"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-fig-sh7 text-neutral-900">
+                          {item.district_name ?? item.grid_id}
+                        </p>
+                        <span className={`shrink-0 rounded-[20px] px-3 py-1 text-fig-sh9 ${riskStyle}`}>
+                          {RECOMMENDATION_LABEL[item.recommendation_type] ?? item.recommendation_type}
+                        </span>
+                      </div>
+                      <p className="text-b7 text-neutral-900">{item.narrative}</p>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </aside>
         )}

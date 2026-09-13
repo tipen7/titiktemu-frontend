@@ -52,8 +52,8 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
             href="/beranda/"
             className="mb-8 flex items-center gap-3 outline-none focus-visible:ring-2 focus-visible:ring-primary-300"
           >
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary-700 text-neutral-0">
-              <MapPinned className="size-7" strokeWidth={1.8} />
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg text-neutral-0">
+              <img src="./titiktemu.png" className="w-[128px]"/>
             </span>
             <span className="font-sans text-h6 font-semibold tracking-tight text-secondary-800">
               TitikTemu

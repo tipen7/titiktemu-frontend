@@ -8,28 +8,46 @@ import {
   LinearScale,
   Tooltip,
 } from "chart.js";
+import { Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Bar } from "react-chartjs-2";
 import { Dropdown } from "@/app/components/ui/dropdown";
+import { Input } from "@/app/components/ui/input";
 import { Skeleton } from "@/app/components/ui/skeleton";
 import { useDashboardSummary } from "@/app/hooks/use-dashboard-summary";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
-// Same zone-color convention as ZONE_BADGE_VARIANT elsewhere (discovery-map,
-// tenant-matching, umkm-self-tracker) -- kept consistent rather than
-// introducing a 4th ad-hoc color for this one chart.
-const COLORS = { aman: "#39b332", waspada: "#00a6a8", bahaya: "#D90E10" };
+// Same aman/waspada/bahaya color convention as ZONE_BADGE_VARIANT and the
+// zone stat cards on beranda/home.tsx (green/yellow/red) -- previously this
+// chart used an ad-hoc teal for "waspada" instead of yellow, which diverged
+// from that convention; aligned here to match both the rest of the app and
+// the Figma spec (node 15004:6438/6468).
+const COLORS = { aman: "#00a85e", waspada: "#ff9600", bahaya: "#D90E10" };
 
-function vulnerabilityTier(index: number): string {
-  if (index >= 0.66) return "Tinggi";
-  if (index >= 0.33) return "Sedang";
-  return "Rendah";
+function vulnerabilityTier(index: number): { label: string; colorClass: string } {
+  if (index >= 0.66) return { label: "Tinggi", colorClass: "text-behavior-red-30" };
+  if (index >= 0.33) return { label: "Sedang", colorClass: "text-behavior-yellow-30" };
+  return { label: "Rendah", colorClass: "text-behavior-green-30" };
 }
+
+// Placeholder rows -- no backend event/audit log exists yet for zone status
+// changes (each analytics batch run only persists the latest snapshot, not
+// a history of transitions). This panel ships as UI-only scaffolding per
+// explicit user decision, same pattern as RiwayatLengkapOverlay in
+// umkm-self-tracker/overlays.tsx. Do not wire this to fabricated backend
+// data -- replace with a real event log once one exists.
+const PLACEHOLDER_HISTORY = [
+  { time: "09:12", event: "Blok G-104 berubah dari Aman menjadi Butuh Perhatian" },
+  { time: "08:47", event: "Blok G-088 berubah dari Butuh Perhatian menjadi Perlu Dipantau" },
+  { time: "Kemarin, 17:30", event: "Blok G-021 berubah dari Perlu Dipantau menjadi Aman" },
+  { time: "Kemarin, 14:05", event: "Blok G-057 berubah dari Aman menjadi Butuh Perhatian" },
+];
 
 export default function EsgDashboard() {
   const { data: summary, isLoading, isError } = useDashboardSummary();
   const [selectedDistrict, setSelectedDistrict] = useState("all");
+  const [historyQuery, setHistoryQuery] = useState("");
 
   const districts = useMemo(
     () => (summary ? Object.entries(summary.by_district) : []),
@@ -66,11 +84,17 @@ export default function EsgDashboard() {
     ? summary.total_tenants_tracked - summary.tenants_needing_reallocation
     : null;
 
+  const filteredHistory = useMemo(() => {
+    const q = historyQuery.trim().toLowerCase();
+    if (!q) return PLACEHOLDER_HISTORY;
+    return PLACEHOLDER_HISTORY.filter((entry) => entry.event.toLowerCase().includes(q));
+  }, [historyQuery]);
+
   return (
-    <div className="flex flex-col gap-4 p-6">
-      <header>
-        <h1 className="text-h6 font-semibold text-secondary-800">ESG Dashboard</h1>
-        <p className="text-b8 text-neutral-600">
+    <div className="flex flex-col gap-6 p-6">
+      <header className="flex flex-col gap-1">
+        <h1 className="text-fig-sh4 text-primary-teal-70">ESG Dashboard</h1>
+        <p className="text-b7 text-neutral-900">
           Pantau distribusi risiko dan dampak sosial kawasan secara real-time.
         </p>
       </header>
@@ -98,9 +122,9 @@ export default function EsgDashboard() {
       {summary && (
         <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="rounded-xl border border-border p-4">
-              <p className="text-b9 text-neutral-500">Grid Berstatus Bahaya</p>
-              <p className="text-h5 font-semibold text-neutral-900">{summary.danger_zone_pct}%</p>
+            <div className="rounded-[12px] border-[1.2px] border-neutral-200 bg-neutral-0 p-4 shadow-[0px_4px_4px_rgba(0,0,0,0.02)]">
+              <p className="text-b7 text-neutral-500">Grid Berstatus Bahaya</p>
+              <p className="text-fig-sh5 text-neutral-900">{summary.danger_zone_pct}%</p>
               <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-neutral-100">
                 <div
                   className="h-full rounded-full bg-primary-500"
@@ -111,17 +135,17 @@ export default function EsgDashboard() {
                 {summary.danger_zone_count} dari {summary.total_grid_cells} grid cell
               </p>
             </div>
-            <div className="rounded-xl border border-border p-4">
-              <p className="text-b9 text-neutral-500">UMKM Terlindungi (zona subsidi)</p>
-              <p className="text-h5 font-semibold text-neutral-900">{umkmProtected} Usaha</p>
+            <div className="rounded-[12px] border-[1.2px] border-neutral-200 bg-neutral-0 p-4 shadow-[0px_4px_4px_rgba(0,0,0,0.02)]">
+              <p className="text-b7 text-neutral-500">UMKM Terlindungi (zona subsidi)</p>
+              <p className="text-fig-sh5 text-neutral-900">{umkmProtected} Usaha</p>
               <p className="mt-2 text-b9 text-neutral-500">
                 dari {summary.total_tenants_tracked} total UMKM yang dipantau
               </p>
             </div>
-            <div className="rounded-xl border border-border p-4">
-              <p className="text-b9 text-neutral-500">Rata-rata Indeks Kerentanan</p>
-              <p className="text-h5 font-semibold text-neutral-900">
-                {vulnerabilityTier(summary.avg_vulnerability_index)}
+            <div className="rounded-[12px] border-[1.2px] border-neutral-200 bg-neutral-0 p-4 shadow-[0px_4px_4px_rgba(0,0,0,0.02)]">
+              <p className="text-b7 text-neutral-500">Rata-rata Indeks Kerentanan</p>
+              <p className={`text-fig-sh5 ${vulnerabilityTier(summary.avg_vulnerability_index).colorClass}`}>
+                {vulnerabilityTier(summary.avg_vulnerability_index).label}
               </p>
               <p className="mt-2 text-b9 text-neutral-500">
                 skor {summary.avg_vulnerability_index.toFixed(3)} dari 1.000
@@ -130,10 +154,10 @@ export default function EsgDashboard() {
           </div>
 
           <div className="flex flex-col gap-4 lg:flex-row">
-            <div className="flex-1 rounded-xl border border-border p-4">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <h2 className="text-s6 font-semibold text-neutral-900">
+            <div className="flex flex-1 flex-col gap-5 rounded-[12px] border-[1.2px] border-neutral-200 bg-neutral-0 p-4 shadow-[0px_4px_4px_rgba(0,0,0,0.02)]">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="flex flex-col gap-1">
+                  <h2 className="text-fig-sh6 text-neutral-900">
                     Distribusi Tingkat Perhatian per Blok
                   </h2>
                   {summary.ews_validation_accuracy_pct !== null && (
@@ -153,72 +177,108 @@ export default function EsgDashboard() {
                   />
                 )}
               </div>
-              {districts.length > 0 ? (
-                <div className="mt-4 h-80">
-                  <Bar
-                    data={{
-                      labels: districts.map(([name]) => name),
-                      datasets: [
-                        {
-                          label: "Relatif Aman",
-                          data: districts.map(([, d]) => d.safe),
-                          backgroundColor: COLORS.aman,
-                        },
-                        {
-                          label: "Butuh Perhatian",
-                          data: districts.map(([, d]) => d.moderate),
-                          backgroundColor: COLORS.waspada,
-                        },
-                        {
-                          label: "Perlu Diperbaiki",
-                          data: districts.map(([, d]) => d.danger),
-                          backgroundColor: COLORS.bahaya,
-                        },
-                      ],
-                    }}
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      scales: { x: { stacked: false }, y: { beginAtZero: true } },
-                      plugins: { legend: { position: "bottom" } },
-                    }}
-                  />
-                </div>
-              ) : (
-                <p className="mt-4 text-b9 text-neutral-500">Belum ada data kawasan.</p>
-              )}
 
-              <div className="mt-4 grid grid-cols-3 gap-3 border-t border-border pt-4 text-center">
-                <div>
-                  <p className="text-s6 font-semibold" style={{ color: COLORS.aman }}>
-                    {distribution.safe} ({pct(distribution.safe)}%)
+              <div className="flex flex-col gap-10">
+                {districts.length > 0 ? (
+                  <div className="h-80">
+                    <Bar
+                      data={{
+                        labels: districts.map(([name]) => name),
+                        datasets: [
+                          {
+                            label: "Relatif Aman",
+                            data: districts.map(([, d]) => d.safe),
+                            backgroundColor: COLORS.aman,
+                          },
+                          {
+                            label: "Butuh Perhatian",
+                            data: districts.map(([, d]) => d.moderate),
+                            backgroundColor: COLORS.waspada,
+                          },
+                          {
+                            label: "Perlu Dipantau",
+                            data: districts.map(([, d]) => d.danger),
+                            backgroundColor: COLORS.bahaya,
+                          },
+                        ],
+                      }}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: { x: { stacked: false }, y: { beginAtZero: true } },
+                        plugins: { legend: { position: "bottom" } },
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <p className="text-b9 text-neutral-500">Belum ada data kawasan.</p>
+                )}
+
+                {/* "Ringkasan Kawasan" (Kawasan/Radius/Periode/Jumlah Zona) from
+                    the Figma frame is intentionally omitted here: this app's
+                    data model (DashboardSummary.by_district) only carries
+                    safe/moderate/danger counts per district -- there's no
+                    radius or periode field to show honestly, so rather than
+                    show a partially-fabricated box we skip it entirely and
+                    keep the distribution summary below (which is fully real
+                    data) in its place. */}
+                <div className="grid grid-cols-3 gap-3 border-t border-border pt-4 text-center">
+                  <p className="col-span-3 -mb-1 text-left text-fig-sh8 text-neutral-700">
+                    Ringkasan Distribusi ({summary.total_grid_cells} Blok)
                   </p>
-                  <p className="text-b9 text-neutral-500">Relatif Aman</p>
-                </div>
-                <div>
-                  <p className="text-s6 font-semibold" style={{ color: COLORS.waspada }}>
-                    {distribution.moderate} ({pct(distribution.moderate)}%)
-                  </p>
-                  <p className="text-b9 text-neutral-500">Butuh Perhatian</p>
-                </div>
-                <div>
-                  <p className="text-s6 font-semibold" style={{ color: COLORS.bahaya }}>
-                    {distribution.danger} ({pct(distribution.danger)}%)
-                  </p>
-                  <p className="text-b9 text-neutral-500">Perlu Diperbaiki</p>
+                  <div>
+                    <p className="text-s6 font-semibold text-behavior-green-30">
+                      {distribution.safe} ({pct(distribution.safe)}%)
+                    </p>
+                    <p className="text-b9 text-neutral-500">Relatif Aman</p>
+                  </div>
+                  <div>
+                    <p className="text-s6 font-semibold text-behavior-yellow-30">
+                      {distribution.moderate} ({pct(distribution.moderate)}%)
+                    </p>
+                    <p className="text-b9 text-neutral-500">Butuh Perhatian</p>
+                  </div>
+                  <div>
+                    <p className="text-s6 font-semibold text-behavior-red-30">
+                      {distribution.danger} ({pct(distribution.danger)}%)
+                    </p>
+                    <p className="text-b9 text-neutral-500">Perlu Dipantau</p>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <aside className="w-full shrink-0 rounded-xl border border-border p-4 lg:w-80">
-              <h2 className="text-s6 font-semibold text-neutral-900">Riwayat Perubahan Status</h2>
-              <p className="mt-3 text-b9 text-neutral-500">
-                Fitur riwayat perubahan status memerlukan pencatatan histori (event log) yang belum
-                tersedia di data saat ini -- setiap batch run hanya menyimpan snapshot terbaru, bukan
-                riwayat perubahannya. Belum ditampilkan agar tidak menampilkan data buatan.
-              </p>
-              <p className="mt-3 text-b9 text-neutral-400">
-                Terakhir diperbarui:{" "}
+            <aside className="flex w-full shrink-0 flex-col gap-4 rounded-[12px] border-[1.2px] border-neutral-200 bg-neutral-0 p-4 shadow-[0px_4px_4px_rgba(0,0,0,0.02)] lg:w-80">
+              <h2 className="text-fig-sh6 text-neutral-900">Riwayat Perubahan Status</h2>
+
+              <Input
+                type="text"
+                placeholder="Cari Histori"
+                value={historyQuery}
+                onChange={(event) => setHistoryQuery(event.target.value)}
+                startIcon={<Search className="size-4" />}
+              />
+
+              {/* Non-functional placeholder log -- see PLACEHOLDER_HISTORY
+                  comment above. No real zone-status event log exists yet;
+                  this UI ships ahead of that backend feature per explicit
+                  user decision (2026-09-13), matching the RiwayatLengkapOverlay
+                  placeholder pattern in umkm-self-tracker/overlays.tsx. */}
+              <div className="flex max-h-64 flex-col gap-3 overflow-y-auto rounded-lg bg-primary-50 p-3">
+                {filteredHistory.length > 0 ? (
+                  filteredHistory.map((entry, index) => (
+                    <div key={index} className="flex flex-col gap-0.5">
+                      <p className="text-b9 text-neutral-600">{entry.time}</p>
+                      <p className="text-b8 text-neutral-900">{entry.event}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-b9 text-neutral-500">Tidak ada histori yang cocok.</p>
+                )}
+              </div>
+
+              <p className="text-b9 text-neutral-400">
+                Terakhir update:{" "}
                 {new Date(summary.computed_at).toLocaleString("id-ID", {
                   dateStyle: "medium",
                   timeStyle: "short",

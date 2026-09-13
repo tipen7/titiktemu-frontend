@@ -1,5 +1,6 @@
 "use client";
 
+import { ListFilter, UserSearch } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
@@ -21,6 +22,21 @@ const TYPE_LABEL: Record<PolicyRecommendation["recommendation_type"], string> = 
 };
 
 const FILTERS = [undefined, "mitigasi", "realokasi", "pemantauan"] as const;
+
+// Same tier thresholds as vulnerabilityTier() in esg-dashboard.tsx, mapped to
+// the behavior-* color tokens instead of a plain label so the index reads as
+// a severity signal in this table (rendah=green, sedang=yellow, tinggi=red).
+function vulnerabilityColor(index: number): string {
+  if (index >= 0.66) return "text-behavior-red-30";
+  if (index >= 0.33) return "text-behavior-yellow-30";
+  return "text-behavior-green-30";
+}
+
+function vulnerabilityTierLabel(index: number): string {
+  if (index >= 0.66) return "Tinggi";
+  if (index >= 0.33) return "Sedang";
+  return "Rendah";
+}
 
 function NarrativeCell({ text }: { text: string }) {
   const [expanded, setExpanded] = useState(false);
@@ -63,39 +79,42 @@ export default function AllocationReport() {
 
   return (
     <div className="flex flex-col gap-4 p-6">
-      <header>
-        <h1 className="text-h6 font-semibold text-secondary-800">Laporan Alokasi</h1>
-        <p className="text-b8 text-neutral-600">
-          Usulan pemanfaatan ruang per blok beserta dasar pertimbangannya.
-        </p>
-      </header>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex flex-wrap gap-2">
-          {FILTERS.map((type) => (
-            <button
-              key={type ?? "all"}
-              type="button"
-              onClick={() => setFilter(type)}
-              aria-pressed={filter === type}
-              className={`h-10 rounded-full border-2 px-4 text-b9 font-semibold transition-colors ${
-                filter === type
-                  ? "border-primary-500 bg-primary-500 text-neutral-0"
-                  : "border-primary-500 text-primary-600 hover:bg-primary-100"
-              }`}
-            >
-              {type ? TYPE_LABEL[type] : "Semua Laporan"}
-            </button>
-          ))}
+      <header className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 className="font-sans text-fig-sh4 text-primary-teal-70">Laporan Alokasi</h1>
+          <p className="text-[16px] text-neutral-900">
+            Usulan pemanfaatan ruang per blok beserta dasar pertimbangannya.
+          </p>
         </div>
-        <div className="ml-auto w-full sm:w-64">
+        <div className="flex w-full items-center gap-3 rounded-[12px] bg-neutral-100 px-4 py-3 shadow-[0px_4px_32px_0px_rgba(0,0,0,0.04)] sm:w-[399px]">
+          <UserSearch className="size-5 shrink-0 text-primary-teal-70" aria-hidden="true" />
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Cari Laporan"
             aria-label="Cari laporan alokasi"
+            className="h-auto border-none bg-transparent p-0 text-b7 text-neutral-900 shadow-none hover:border-none focus:border-none focus:ring-0"
           />
+          <ListFilter className="size-5 shrink-0 text-neutral-500" aria-hidden="true" />
         </div>
+      </header>
+
+      <div className="flex flex-wrap gap-3">
+        {FILTERS.map((type) => (
+          <button
+            key={type ?? "all"}
+            type="button"
+            onClick={() => setFilter(type)}
+            aria-pressed={filter === type}
+            className={`rounded-[23px] px-5 py-2 text-[16px] transition-colors ${
+              filter === type
+                ? "bg-primary-teal-60 text-white"
+                : "border-[1.6px] border-primary-teal-60 bg-neutral-50 text-primary-teal-70"
+            }`}
+          >
+            {type ? TYPE_LABEL[type] : "Semua Laporan"}
+          </button>
+        ))}
       </div>
 
       {isError && (
@@ -104,21 +123,31 @@ export default function AllocationReport() {
         </p>
       )}
 
-      <div className="overflow-x-auto rounded-xl border border-border">
+      <div className="overflow-x-auto rounded-[12px] border-[0.8px] border-neutral-200">
         <table className="w-full text-left text-b9">
-          <thead className="border-b border-border bg-neutral-50">
+          <thead>
             <tr>
-              <th className="w-32 p-3 font-semibold text-neutral-700">Blok / Grid ID</th>
-              <th className="w-40 p-3 font-semibold text-neutral-700">Indeks Kerentanan</th>
-              <th className="p-3 font-semibold text-neutral-700">Usulan Alokasi</th>
-              <th className="w-28 p-3 font-semibold text-neutral-700">Jenis</th>
-              <th className="w-32 p-3 font-semibold text-neutral-700">Detail</th>
+              <th className="w-40 p-3 font-sans text-fig-sh7 tracking-[0.64px] text-neutral-900">
+                BLOK / GRID ID
+              </th>
+              <th className="w-44 p-3 font-sans text-fig-sh7 tracking-[0.64px] text-neutral-900">
+                INDEKS KERENTANAN
+              </th>
+              <th className="p-3 font-sans text-fig-sh7 tracking-[0.64px] text-neutral-900">
+                USULAN ALOKASI
+              </th>
+              <th className="w-24 p-3 font-sans text-fig-sh7 tracking-[0.64px] text-neutral-900">
+                JENIS
+              </th>
+              <th className="w-28 p-3 font-sans text-fig-sh7 tracking-[0.64px] text-neutral-900">
+                DETAIL
+              </th>
             </tr>
           </thead>
           <tbody>
             {isLoading &&
               Array.from({ length: 3 }).map((_, index) => (
-                <tr key={index} className="border-b border-border last:border-0">
+                <tr key={index} className="border-b border-neutral-200 last:border-0">
                   <td className="p-3" colSpan={5}>
                     <Skeleton className="h-12 w-full" />
                   </td>
@@ -134,19 +163,29 @@ export default function AllocationReport() {
             )}
             {!isLoading &&
               recommendations.map((item) => (
-                <tr key={item.grid_id} className="border-b border-border last:border-0 align-top">
+                <tr key={item.grid_id} className="border-b border-neutral-200 align-top last:border-0">
                   <td className="p-3 font-medium text-neutral-900">
                     {item.district_name ?? "-"}
                     <br />
                     <span className="text-neutral-500">{item.grid_id}</span>
                   </td>
-                  <td className="p-3 text-neutral-600">{item.vulnerability_index.toFixed(3)}</td>
+                  <td className="p-3">
+                    <span className={`font-medium ${vulnerabilityColor(item.vulnerability_index)}`}>
+                      {vulnerabilityTierLabel(item.vulnerability_index)}
+                    </span>
+                    <br />
+                    <span className="text-neutral-500">{item.vulnerability_index.toFixed(3)}</span>
+                  </td>
                   <td className="p-3">
                     <NarrativeCell text={item.narrative} />
                   </td>
                   <td className="p-3 text-neutral-600">{TYPE_LABEL[item.recommendation_type]}</td>
                   <td className="p-3">
-                    <Button variant="secondary-ghost" size="sm" onClick={() => setDetailItem(item)}>
+                    <Button
+                      size="sm"
+                      onClick={() => setDetailItem(item)}
+                      className="rounded-[8px] bg-primary-teal-60 px-3 py-3 text-white shadow-[0px_4px_32px_0px_rgba(0,0,0,0.04)] hover:bg-primary-teal-70"
+                    >
                       Tinjau Usulan
                     </Button>
                   </td>

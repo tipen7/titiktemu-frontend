@@ -1,19 +1,38 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Dialog, DialogContent } from "@/app/components/ui/dialog";
 import { Dropdown } from "@/app/components/ui/dropdown";
 import { Input } from "@/app/components/ui/input";
 import { Skeleton } from "@/app/components/ui/skeleton";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/app/components/ui/sheet";
 import { useGrid } from "@/app/hooks/use-grid";
 import { useUmkm } from "@/app/hooks/use-umkm";
+import { useAuth } from "@/app/lib/auth";
 import type { UmkmBusiness } from "@/app/types/umkm";
+import {
+  ApproveConfirmOverlay,
+  DetailUsahaOverlay,
+  DokumentasiLapanganOverlay,
+  HubungiPemilikOverlay,
+  type HistoryEntry,
+  RiwayatLengkapOverlay,
+} from "./overlays";
+import UmkmSelfTrackerForm from "./self-tracker-form";
+
+// UI-only demo history/photos -- see overlays.tsx's file comment. No
+// per-business audit trail or documentation-photo storage exists yet, so
+// this is the same example content for every business rather than
+// per-row fabricated data.
+const DEMO_HISTORY: HistoryEntry[] = [
+  { date: "6 Sep 2026", action: "Update foto usaha", actor: "Pemilik Usaha", status: "Dalam Pengajuan" },
+  { date: "6 Sep 2026", action: "Perubahan status usaha", actor: "Pemilik Usaha", status: "Disetujui" },
+  { date: "3 Sep 2026", action: "Update harga", actor: "Pemilik Usaha", status: "Disetujui" },
+  { date: "2 Sep 2026", action: "Update titik lokasi", actor: "Pemilik Usaha", status: "Disetujui" },
+  { date: "1 Sep 2026", action: "Update titik lokasi", actor: "Pemilik Usaha", status: "Ditolak" },
+  { date: "26 Agu 2026", action: "Pengajuan formulir usaha", actor: "Pemilik Usaha", status: "Disetujui" },
+];
+
+type OverlayView = "history" | "contact" | "docs" | "approve" | null;
 
 const STATUS_OPTIONS = [
   { value: "all", label: "Semua Status" },
@@ -49,12 +68,25 @@ function StatusPill({ label, variant }: { label: string; variant: "aman" | "wasp
 }
 
 export default function UMKMSelfTracker() {
+  const { role } = useAuth();
+
+  if (role === "umkm") {
+    return <UmkmSelfTrackerForm />;
+  }
+
+  return <UMKMSelfTrackerOperatorView />;
+}
+
+// Existing operator-facing approval/review table -- unchanged below, just
+// extracted so the `umkm` role branch above can short-circuit before it.
+function UMKMSelfTrackerOperatorView() {
   const [search, setSearch] = useState("");
   const [district, setDistrict] = useState("all");
   const [ewsFilter, setEwsFilter] = useState<number | undefined>(undefined);
   const [sort, setSort] = useState<(typeof SORT_OPTIONS)[number]["value"]>("none");
   const [page, setPage] = useState(0);
   const [detailUmkm, setDetailUmkm] = useState<UmkmBusiness | null>(null);
+  const [overlayView, setOverlayView] = useState<OverlayView>(null);
 
   const { data: grid } = useGrid();
   const districtOptions = useMemo(() => {
@@ -288,53 +320,55 @@ export default function UMKMSelfTracker() {
         </div>
       </div>
 
-      <Sheet open={detailUmkm !== null} onOpenChange={(open) => !open && setDetailUmkm(null)}>
-        <SheetContent>
-          {detailUmkm && (
-            <>
-              <SheetHeader>
-                <SheetTitle>{detailUmkm.name ?? "Detail Usaha"}</SheetTitle>
-                <SheetDescription>{detailUmkm.category ?? "-"}</SheetDescription>
-              </SheetHeader>
-              <div className="flex flex-col gap-3 px-4 pb-4">
-                {detailUmkm.zone_label && (
-                  <StatusPill label={detailUmkm.zone_label.toUpperCase()} variant={detailUmkm.zone_label} />
-                )}
-                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-b9">
-                  <dt className="text-neutral-500">Blok / Grid ID</dt>
-                  <dd className="text-neutral-800">{detailUmkm.grid_id}</dd>
-                  <dt className="text-neutral-500">Kawasan</dt>
-                  <dd className="text-neutral-800">
-                    {detailUmkm.district_name ?? "-"} &middot; {detailUmkm.kecamatan ?? "-"}
-                  </dd>
-                  <dt className="text-neutral-500">Indeks Kerentanan</dt>
-                  <dd className="text-neutral-800">
-                    {detailUmkm.vulnerability_index !== null ? detailUmkm.vulnerability_index.toFixed(3) : "-"}
-                  </dd>
-                  <dt className="text-neutral-500">Matching Score</dt>
-                  <dd className="text-neutral-800">
-                    {detailUmkm.matching_score !== null ? `${Math.round(detailUmkm.matching_score)}%` : "-"}
-                  </dd>
-                  <dt className="text-neutral-500">Keyakinan Data</dt>
-                  <dd className="text-neutral-800">
-                    {detailUmkm.data_confidence !== null
-                      ? `${Math.round(detailUmkm.data_confidence * 100)}%`
-                      : "-"}
-                  </dd>
-                  <dt className="text-neutral-500">Jarak ke Stasiun</dt>
-                  <dd className="text-neutral-800">
-                    {detailUmkm.dist_to_station_m !== null
-                      ? `${Math.round(detailUmkm.dist_to_station_m)} m`
-                      : "-"}
-                  </dd>
-                  <dt className="text-neutral-500">Sumber Data</dt>
-                  <dd className="text-neutral-800">{detailUmkm.source}</dd>
-                </dl>
-              </div>
-            </>
+      <Dialog
+        open={detailUmkm !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDetailUmkm(null);
+            setOverlayView(null);
+          }
+        }}
+      >
+        <DialogContent>
+          {detailUmkm && overlayView === null && (
+            <DetailUsahaOverlay
+              umkm={detailUmkm}
+              onClose={() => setDetailUmkm(null)}
+              onOpenHistory={() => setOverlayView("history")}
+              onOpenContact={() => setOverlayView("contact")}
+              onOpenDocs={() => setOverlayView("docs")}
+              onOpenApprove={() => setOverlayView("approve")}
+            />
           )}
-        </SheetContent>
-      </Sheet>
+          {detailUmkm && overlayView === "history" && (
+            <RiwayatLengkapOverlay
+              umkmName={detailUmkm.name ?? "Usaha"}
+              history={DEMO_HISTORY}
+              onClose={() => setOverlayView(null)}
+            />
+          )}
+          {detailUmkm && overlayView === "contact" && (
+            <HubungiPemilikOverlay
+              umkmName={detailUmkm.name ?? "Usaha"}
+              onCancel={() => setOverlayView(null)}
+            />
+          )}
+          {detailUmkm && overlayView === "docs" && (
+            <DokumentasiLapanganOverlay
+              umkmName={detailUmkm.name ?? "Usaha"}
+              photos={[]}
+              onClose={() => setOverlayView(null)}
+            />
+          )}
+          {detailUmkm && overlayView === "approve" && (
+            <ApproveConfirmOverlay
+              umkmName={detailUmkm.name ?? "Usaha"}
+              onConfirm={() => setOverlayView(null)}
+              onCancel={() => setOverlayView(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "cn";
 
 const badgeVariants = cva(
-  "group/badge inline-flex h-10 w-fit min-w-36 shrink-0 items-center justify-center gap-2 overflow-hidden rounded-full border-2 bg-transparent px-6 font-sans text-base font-normal whitespace-nowrap transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 has-data-[icon=inline-end]:pr-5 has-data-[icon=inline-start]:pl-5 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 sm:h-12 sm:px-8 sm:text-xl [&>svg]:pointer-events-none [&>svg]:size-5!",
+  "group/badge inline-flex h-7 w-fit shrink-0 items-center justify-center gap-1.5 overflow-hidden rounded-full border bg-transparent px-3 font-sans text-xs font-medium whitespace-nowrap transition-colors focus-visible:border-ring focus-visible:ring-[2px] focus-visible:ring-ring/50 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3.5!",
   {
     variants: {
       variant: {
@@ -18,9 +18,15 @@ const badgeVariants = cva(
         default:
           "border-primary-500 text-primary-600 hover:bg-primary-100 active:border-primary-500 active:bg-primary-500 active:text-neutral-0 aria-pressed:border-primary-500 aria-pressed:bg-primary-500 aria-pressed:text-neutral-0",
       },
+      size: {
+        sm: "h-6 px-2.5 text-[11px]",
+        default: "h-7 px-3 text-xs",
+        lg: "h-8 px-4 text-sm",
+      },
     },
     defaultVariants: {
       variant: "default",
+      size: "default",
     },
   },
 );
@@ -28,6 +34,7 @@ const badgeVariants = cva(
 function Badge({
   className,
   variant = "default",
+  size = "default",
   selected,
   defaultSelected = false,
   selectable = true,
@@ -61,7 +68,7 @@ function Badge({
     defaultTagName: "span",
     props: mergeProps<"span">(
       {
-        className: cn(badgeVariants({ variant }), className),
+        className: cn(badgeVariants({ variant, size }), className),
         "aria-pressed": selectable ? isSelected : undefined,
         onClick: selectable || onClick ? handleClick : undefined,
         onKeyDown: selectable
@@ -83,6 +90,7 @@ function Badge({
     state: {
       slot: "badge",
       variant,
+      size,
     },
   });
 }

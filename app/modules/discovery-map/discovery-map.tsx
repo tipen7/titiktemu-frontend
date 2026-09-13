@@ -1,19 +1,22 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
-import { AiPanel } from "@/app/components/modules/ai-panel";
+import dynamic from "next/dynamic";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
 import { Badge } from "@/app/components/ui/badge";
 import { Button } from "@/app/components/ui/button";
 import { ConfidenceBadge } from "@/app/components/ui/confidence-badge";
 import { Input } from "@/app/components/ui/input";
 import { Skeleton } from "@/app/components/ui/skeleton";
+import { MapLegend } from "@/app/components/map/map-legend";
+import { AiPanel } from "@/app/components/modules/ai-panel";
+import { useCurrentLocation } from "@/app/hooks/use-current-location";
 import { useGrid } from "@/app/hooks/use-grid";
 import { useModelAccuracy } from "@/app/hooks/use-model-accuracy";
-import { useUmkm } from "@/app/hooks/use-umkm";
 import { useZoneLookup } from "@/app/hooks/use-zone-lookup";
+import { useUmkm } from "@/app/hooks/use-umkm";
+import { downloadCsv } from "@/app/lib/csv";
 import type { ZoneLabel } from "@/app/types/zones";
 
 // react-leaflet touches `window` at module-load time, which crashes Next's
@@ -27,6 +30,14 @@ const GeoJsonLayer = dynamic(
   () => import("@/app/components/map/geojson-layer").then((mod) => mod.GeoJsonLayer),
   { ssr: false },
 );
+const CurrentLocationMarker = dynamic(
+  () => import("@/app/components/map/current-location-marker").then((mod) => mod.CurrentLocationMarker),
+  { ssr: false },
+);
+const MapControls = dynamic(
+  () => import("@/app/components/map/map-controls").then((mod) => mod.MapControls),
+  { ssr: false },
+);
 
 const ZONE_BADGE_VARIANT: Record<ZoneLabel, "secondary" | "default" | "primary"> = {
   aman: "secondary",
@@ -34,80 +45,125 @@ const ZONE_BADGE_VARIANT: Record<ZoneLabel, "secondary" | "default" | "primary">
   bahaya: "primary",
 };
 
-const RISK_FILTERS = [
-  { value: "all", label: "Semua Titik" },
-  { value: "2", label: "Risiko Tinggi" },
-  { value: "1", label: "Warning" },
-] as const;
+const FILTERS = [
+  { label: "Semua Titik", ews: undefined, variant: "secondary" as const },
+  { label: "Bahaya", ews: 2, variant: "primary" as const },
+  { label: "Waspada", ews: 1, variant: "default" as const },
+  { label: "Aman", ews: 0, variant: "secondary" as const },
+];
 
-function downloadCsv(rows: { name: string | null; grid_id: string; district_name: string | null; vulnerability_index: number | null; dist_to_station_m: number | null }[]) {
-  const header = "Nama Usaha,Blok/Grid ID,Kawasan,Indeks Kerentanan,Jarak ke Stasiun (m)";
-  const lines = rows.map((r) =>
-    [r.name ?? "-", r.grid_id, r.district_name ?? "-", r.vulnerability_index ?? "-", r.dist_to_station_m ?? "-"]
-      .map((value) => `"${String(value).replace(/"/g, '""')}"`)
-      .join(","),
-  );
-  const csv = [header, ...lines].join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "discovery-map-risiko-tinggi.csv";
-  link.click();
-  URL.revokeObjectURL(url);
-}
+const ZONE_TEXT_COLOR: Record<ZoneLabel, string> = {
+  aman: "text-behavior-green-30",
+  waspada: "text-behavior-yellow-30",
+  bahaya: "text-behavior-red-30",
+};
+
+// Pill styling per Figma (node 15004:6724): the real 3-category zone_label
+// taxonomy (aman/waspada/bahaya) is intentionally kept as-is -- only the
+// chip's visual chrome is restyled to Figma's pill/active look.
+const FILTER_CHIP_CLASSNAME =
+  "h-auto min-w-0 rounded-[23px] border-[1.6px] border-primary-teal-60 bg-neutral-50 px-5 py-2 text-b9 text-primary-teal-70 hover:bg-neutral-100 aria-pressed:border-primary-teal-60 aria-pressed:bg-primary-teal-60 aria-pressed:text-white";
 
 export default function DiscoveryMap() {
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
-  const paramLat = searchParams.get("lat");
-  const paramLng = searchParams.get("lng");
 
   const { data: grid, isLoading: isGridLoading, isError: isGridError } = useGrid();
   const { data: modelAccuracy } = useModelAccuracy();
+  const { location: currentLocation } = useCurrentLocation();
+
+  const [ewsFilter, setEwsFilter] = useState<number | undefined>(undefined);
   const [search, setSearch] = useState("");
-  const [riskFilter, setRiskFilter] = useState<(typeof RISK_FILTERS)[number]["value"]>("all");
-  const [clickedLocation, setClickedLocation] = useState<{ lat: number; lng: number } | null>(
-    paramLat !== null && paramLng !== null ? { lat: Number(paramLat), lng: Number(paramLng) } : null,
-  );
-
-  const { data: zone, isLoading: isZoneLoading } = useZoneLookup(clickedLocation);
-
-  const { data: umkmResult, isLoading: isUmkmLoading } = useUmkm({
+  const [mapExpanded, setMapExpanded] = useState(false);
+  const { data: candidates, isLoading: isCandidatesLoading } = useUmkm({
     search: search || undefined,
-    ews_code: riskFilter === "all" ? undefined : Number(riskFilter),
+    ews_code: ewsFilter,
     limit: 50,
   });
-  const riskList = useMemo(
-    () =>
-      [...(umkmResult?.rows ?? [])].sort(
-        (a, b) => (b.vulnerability_index ?? 0) - (a.vulnerability_index ?? 0),
-      ),
-    [umkmResult],
-  );
+
+  const selectedId = searchParams.get("umkm");
+  const selected = candidates?.rows.find((row) => row.id === selectedId) ?? null;
+  const clickedLocationFromParams = (() => {
+    const lat = searchParams.get("lat");
+    const lng = searchParams.get("lng");
+    return lat && lng ? { lat: Number(lat), lng: Number(lng) } : null;
+  })();
+  const activeLocation = selected
+    ? { lat: selected.latitude, lng: selected.longitude }
+    : clickedLocationFromParams;
+
+  const { data: zone, isLoading: isZoneLoading } = useZoneLookup(activeLocation);
+
+  // Selection is reflected in the URL (deep-linkable/shareable) rather than
+  // only in component state -- per UX guidance on reflecting dynamic view
+  // state in the URL.
+  function selectUmkm(id: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("umkm", id);
+    params.delete("lat");
+    params.delete("lng");
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }
+
+  function selectMapPoint(lat: number, lng: number) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("umkm");
+    params.set("lat", String(lat));
+    params.set("lng", String(lng));
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }
+
+  function exportCsv() {
+    if (!candidates?.rows.length) return;
+    downloadCsv(
+      `discovery-map-${ewsFilter ?? "semua"}.csv`,
+      candidates.rows.map((row) => ({
+        nama: row.name,
+        kategori: row.category,
+        kawasan: row.district_name,
+        grid_id: row.grid_id,
+        status: row.zone_label,
+        indeks_kerentanan: row.vulnerability_index,
+        jarak_ke_stasiun_m: row.dist_to_station_m,
+      })),
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4 p-6">
-      <header>
-        <h1 className="text-h6 font-semibold text-secondary-800">Discovery Map</h1>
-        <p className="text-b8 text-neutral-600">
-          Peta sebaran risiko gentrifikasi seluruh UMKM di kawasan.
-        </p>
-      </header>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex flex-wrap gap-2">
-          {RISK_FILTERS.map((filter) => (
-            <Badge
-              key={filter.value}
-              variant={filter.value === "2" ? "primary" : filter.value === "1" ? "default" : "secondary"}
-              selected={riskFilter === filter.value}
-              onSelectedChange={() => setRiskFilter(filter.value)}
-              className="h-9 min-w-0 px-4 text-b9"
-            >
-              {filter.label}
-            </Badge>
-          ))}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-sans text-[30px] text-primary-teal-70">Discovery Map</h1>
+          <p className="text-[16px] text-neutral-900">
+            Peta sebaran risiko gentrifikasi seluruh UMKM di kawasan
+          </p>
         </div>
+        <div className="w-full sm:w-64">
+          <Input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Cari Kandidat"
+            aria-label="Cari kandidat UMKM"
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {FILTERS.map((filter) => (
+          <Badge
+            key={filter.label}
+            variant={filter.variant}
+            selected={ewsFilter === filter.ews}
+            onSelectedChange={() => setEwsFilter(filter.ews)}
+            className={FILTER_CHIP_CLASSNAME}
+          >
+            {filter.label}
+            {candidates && filter.ews !== undefined && (
+              <span className="ml-1">({candidates.rows.filter((r) => r.ews_code === filter.ews).length})</span>
+            )}
+          </Badge>
+        ))}
       </div>
 
       {isGridError && (
@@ -118,52 +174,117 @@ export default function DiscoveryMap() {
       )}
 
       <div className="flex flex-col gap-4 lg:flex-row">
-        <div className="relative flex-1">
+        <div
+          className={
+            mapExpanded
+              ? "fixed inset-4 z-50 flex flex-col rounded-[12px] bg-neutral-0 p-2 shadow-2xl"
+              : "relative flex-1 overflow-clip rounded-[12px]"
+          }
+        >
           {!isGridLoading && (
             <LeafletMap
-              center={clickedLocation ? [clickedLocation.lat, clickedLocation.lng] : undefined}
-              onClick={(lat, lng) => setClickedLocation({ lat, lng })}
+              className={`w-full rounded-[12px] ${mapExpanded ? "h-full flex-1" : "h-[600px]"}`}
+              onClick={selectMapPoint}
+              flyTo={selected ? { lat: selected.latitude, lng: selected.longitude, zoom: 16 } : null}
             >
               <GeoJsonLayer data={grid} modelAccuracy={modelAccuracy} />
+              {currentLocation && (
+                <CurrentLocationMarker lat={currentLocation.lat} lng={currentLocation.lng} />
+              )}
+              <MapControls expanded={mapExpanded} onExpandToggle={() => setMapExpanded((prev) => !prev)} />
             </LeafletMap>
           )}
+          <MapLegend caption="Skor disusun dari indeks gabungan data survei dan data spasial terbuka. Sifatnya alat bantu keputusan, bukan model prediktif yang tervalidasi secara statistik." />
           <AiPanel role="operator" />
+        </div>
 
-          {clickedLocation && (
-            <div className="absolute bottom-4 left-4 z-[1000] w-72 rounded-xl border border-border bg-neutral-0 p-3 shadow-lg">
-              {isZoneLoading && <Skeleton className="h-20 w-full" />}
+        <aside className="flex w-full shrink-0 flex-col gap-3 lg:w-80">
+          <div className="flex items-center justify-between">
+            <h2 className="text-s6 font-semibold text-neutral-900">
+              {FILTERS.find((f) => f.ews === ewsFilter)?.label} ({candidates?.total ?? 0})
+            </h2>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={exportCsv}
+              disabled={!candidates?.rows.length}
+              className="rounded-[8px] border-neutral-500 text-neutral-600 font-semibold shadow-[0px_4px_24px_0px_rgba(0,0,0,0.04)]"
+            >
+              Export .csv
+            </Button>
+          </div>
+
+          <div className="flex max-h-[520px] flex-col gap-2 overflow-y-auto">
+            {isCandidatesLoading &&
+              Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+            {!isCandidatesLoading && candidates?.rows.length === 0 && (
+              <p className="text-b9 text-neutral-500">Tidak ada UMKM yang cocok dengan filter ini.</p>
+            )}
+            {!isCandidatesLoading &&
+              candidates?.rows.map((row) => (
+                <button
+                  key={row.id}
+                  type="button"
+                  onClick={() => selectUmkm(row.id)}
+                  aria-pressed={selectedId === row.id}
+                  className={`flex items-center gap-3 rounded-[12px] border p-3 text-left transition-colors hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 ${
+                    selectedId === row.id ? "border-primary-500 bg-primary-50" : "border-neutral-200"
+                  }`}
+                >
+                  <div className="flex-1">
+                    <p className="text-[16px] font-semibold text-black">{row.name ?? "-"}</p>
+                    <p className="text-b9 text-neutral-600">
+                      {row.dist_to_station_m !== null ? `${Math.round(row.dist_to_station_m)}m` : "-"} &middot;{" "}
+                      {row.district_name} &middot; Blok {row.grid_id}
+                    </p>
+                  </div>
+                  {row.zone_label && (
+                    <span className={`shrink-0 text-fig-sh9 ${ZONE_TEXT_COLOR[row.zone_label]}`}>
+                      {row.zone_label.toUpperCase()}
+                    </span>
+                  )}
+                </button>
+              ))}
+          </div>
+
+          {(selected || clickedLocationFromParams) && (
+            <div className="rounded-xl border border-border p-4">
+              <h2 className="text-s6 font-semibold text-neutral-900">Detail Zona</h2>
+              {isZoneLoading && <Skeleton className="mt-2 h-24 w-full" />}
               {!isZoneLoading && !zone && (
-                <p className="text-b9 text-neutral-500">Lokasi ini di luar area studi.</p>
+                <p className="mt-2 text-b8 text-neutral-500">Lokasi ini di luar area studi.</p>
               )}
               {!isZoneLoading && zone && (
-                <div className="flex flex-col gap-2">
+                <div className="mt-2 flex flex-col gap-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant={ZONE_BADGE_VARIANT[zone.zone_label]} selectable={false}>
                       {zone.zone_label.toUpperCase()}
                     </Badge>
                     <ConfidenceBadge modelAccuracy={zone.model_accuracy} />
                   </div>
-                  <dl className="text-b9">
+                  <dl className="flex flex-col gap-1 text-b8">
                     <div>
-                      <dt className="inline font-semibold text-neutral-700">Blok: </dt>
-                      <dd className="inline text-neutral-600">{zone.grid_id}</dd>
+                      <dt className="inline font-semibold">Blok: </dt>
+                      <dd className="inline">{zone.grid_id}</dd>
                     </div>
                     <div>
-                      <dt className="inline font-semibold text-neutral-700">Kawasan: </dt>
-                      <dd className="inline text-neutral-600">{zone.district_name ?? "-"}</dd>
+                      <dt className="inline font-semibold">Kawasan: </dt>
+                      <dd className="inline">{zone.district_name ?? "-"}</dd>
                     </div>
                     <div>
-                      <dt className="inline font-semibold text-neutral-700">Indeks Kerentanan: </dt>
-                      <dd className="inline text-neutral-600">{zone.vulnerability_index.toFixed(3)}</dd>
+                      <dt className="inline font-semibold">Indeks Kerentanan: </dt>
+                      <dd className="inline">{zone.vulnerability_index.toFixed(3)}</dd>
+                    </div>
+                    <div>
+                      <dt className="inline font-semibold">Matching Score: </dt>
+                      <dd className="inline">{zone.matching_score.toFixed(1)}</dd>
                     </div>
                   </dl>
-                  {zone.narrative && <p className="text-b9 text-neutral-600">{zone.narrative}</p>}
+                  {zone.narrative && <p className="mt-1 text-b9 text-neutral-600">{zone.narrative}</p>}
                   {zone.ews_code > 0 && (
                     <Button
                       size="sm"
-                      render={
-                        <Link href={`/tenant-matching/?lat=${clickedLocation.lat}&lng=${clickedLocation.lng}`} />
-                      }
+                      render={<Link href={`/tenant-matching/?lat=${activeLocation?.lat}&lng=${activeLocation?.lng}`} />}
                     >
                       Lihat Realokasi
                     </Button>
@@ -172,56 +293,6 @@ export default function DiscoveryMap() {
               )}
             </div>
           )}
-        </div>
-
-        <aside className="flex w-full shrink-0 flex-col gap-3 lg:w-80">
-          <Input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Cari Kandidat"
-            aria-label="Cari UMKM"
-          />
-          <div className="flex items-center justify-between">
-            <h2 className="text-s6 font-semibold text-neutral-900">
-              {riskFilter === "all" ? "Semua Titik" : RISK_FILTERS.find((f) => f.value === riskFilter)?.label}{" "}
-              ({riskList.length})
-            </h2>
-          </div>
-
-          <div className="flex max-h-[480px] flex-col gap-2 overflow-y-auto">
-            {isUmkmLoading &&
-              Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
-            {!isUmkmLoading && riskList.length === 0 && (
-              <p className="text-b9 text-neutral-500">Tidak ada UMKM yang cocok.</p>
-            )}
-            {!isUmkmLoading &&
-              riskList.map((umkm) => (
-                <button
-                  key={umkm.id}
-                  type="button"
-                  onClick={() => setClickedLocation({ lat: umkm.latitude, lng: umkm.longitude })}
-                  className="flex flex-col gap-1 rounded-xl border border-border p-3 text-left transition-colors hover:bg-neutral-50"
-                >
-                  <span className="text-b9 font-semibold text-neutral-900">{umkm.name ?? "-"}</span>
-                  <span className="text-b9 text-neutral-500">
-                    {umkm.dist_to_station_m !== null
-                      ? `${Math.round(umkm.dist_to_station_m)}m dari stasiun`
-                      : (umkm.district_name ?? "-")}
-                    {umkm.vulnerability_index !== null &&
-                      ` · Kerentanan ${umkm.vulnerability_index.toFixed(2)}`}
-                  </span>
-                </button>
-              ))}
-          </div>
-
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={riskList.length === 0}
-            onClick={() => downloadCsv(riskList)}
-          >
-            Export list (.csv)
-          </Button>
         </aside>
       </div>
     </div>

@@ -1,16 +1,71 @@
 "use client";
 
+// Restyled to match Figma node 15004:6635 ("Smart Tenant Matching").
+//
+// UI-ONLY caveat: the Figma frame's candidate cards assume each candidate
+// IS a tenant business (name, category, capital, a photo, a free-text AI
+// narrative). The real data model doesn't work that way -- `useReallocation`
+// returns `ReallocationCandidate` rows describing candidate DESTINATION
+// ZONES for the one already-selected at-risk UMKM, not a list of tenant
+// businesses with their own name/category/capital. So several Figma fields
+// have no backing field at all and are rendered as clearly-commented
+// placeholder/example content below (same pattern as
+// app/modules/umkm-self-tracker/overlays.tsx). Nothing here fabricates a
+// business name, photo URL, or timestamp -- see inline comments for exactly
+// which fields are real vs. placeholder.
+
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
+import { ImageOff } from "lucide-react";
 import { Badge } from "@/app/components/ui/badge";
 import { ConfidenceBadge } from "@/app/components/ui/confidence-badge";
 import { Input } from "@/app/components/ui/input";
 import { Skeleton } from "@/app/components/ui/skeleton";
+import { MapLegend } from "@/app/components/map/map-legend";
 import { useReallocation } from "@/app/hooks/use-reallocation";
 import { useUmkm } from "@/app/hooks/use-umkm";
 import { useZoneLookup } from "@/app/hooks/use-zone-lookup";
 import type { ReallocationCandidate } from "@/app/types/zones";
+
+// Bucketed label for "Kesesuaian ESG" -- there is no distinct ESG field in
+// the data model, so this is `matching_score` (a real field) re-labeled
+// and bucketed, not a separate real metric. The UI says so via a caption.
+// Thresholds mirror app/modules/beranda/home.tsx's matchingTier().
+function esgSuitabilityLabel(matchingScore: number): string {
+  const rounded = Math.round(matchingScore);
+  if (matchingScore >= 75) return `Tinggi (${rounded}%)`;
+  if (matchingScore >= 50) return `Sedang (${rounded}%)`;
+  return `Rendah (${rounded}%)`;
+}
+
+// "Status" in Figma is an operational status with a since-date ("Butuh
+// perhatian -- sejak 12 Agustus 2026"). No such tracked status/timestamp
+// exists anywhere in the data model. The closest REAL equivalent is
+// `crossed_district`, which does say something meaningful about the
+// candidate zone's relationship to the origin -- so that's what's shown;
+// the since-date is not fabricated.
+function candidateStatusLabel(candidate: ReallocationCandidate): string {
+  return candidate.crossed_district
+    ? "Lintas kawasan dari lokasi asal"
+    : "Dalam kawasan yang sama dengan lokasi asal";
+}
+
+// "Lokasi" built entirely from real candidate fields.
+function candidateLocationLabel(candidate: ReallocationCandidate): string {
+  const district = candidate.recommended_district ?? "Kawasan tidak diketahui";
+  return `${district} · grid ${candidate.recommended_grid_id} · ${candidate.distance_m.toFixed(0)} m dari pintu keluar stasiun`;
+}
+
+const LeafletMap = dynamic(
+  () => import("@/app/components/map/leaflet-map").then((mod) => mod.LeafletMap),
+  { ssr: false },
+);
+const ReallocationLayer = dynamic(
+  () => import("@/app/components/map/reallocation-layer").then((mod) => mod.ReallocationLayer),
+  { ssr: false },
+);
 
 // GeoJSON polygon coordinates are [lng, lat] rings -- a simple average of
 // the exterior ring's vertices is precise enough to center a map link on,
@@ -24,15 +79,21 @@ function polygonCentroid(candidate: ReallocationCandidate): { lat: number; lng: 
   return { lat: sum.lat / (ring.length || 1), lng: sum.lng / (ring.length || 1) };
 }
 
+type Decision = "diterima" | "ditolak";
+
 export default function TenantMatching() {
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
+
   const paramLat = searchParams.get("lat");
   const paramLng = searchParams.get("lng");
   const hasParamLocation = paramLat !== null && paramLng !== null;
 
   const [search, setSearch] = useState("");
   const [selectedUmkmId, setSelectedUmkmId] = useState<string | null>(null);
-  const [selectedCandidate, setSelectedCandidate] = useState<ReallocationCandidate | null>(null);
+  const [decisions, setDecisions] = useState<Record<string, Decision>>({});
+  const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
 
   // Only zone_label !== "aman" businesses are actually eligible for
   // reallocation (see reallocation.eligible below) -- filtering the picker
@@ -63,143 +124,256 @@ export default function TenantMatching() {
     isEligibleForLookup,
   );
 
+  const selectedCandidate: ReallocationCandidate | null =
+    reallocation?.candidates.find((c) => c.recommended_grid_id === selectedCandidateId) ??
+    reallocation?.candidates[0] ??
+    null;
+
+  function selectUmkm(id: string) {
+    setSelectedUmkmId(id);
+    setSelectedCandidateId(null);
+    // Clear any lat/lng deep-link so the real business selection takes over.
+    if (hasParamLocation) router.replace(pathname, { scroll: false });
+  }
+
   return (
     <div className="flex flex-col gap-4 p-6">
       <header>
-        <h1 className="text-h6 font-semibold text-secondary-800">Smart Tenant Matching</h1>
-        <p className="text-b8 text-neutral-600">
-          Kandidat lokasi realokasi yang direkomendasikan AI untuk UMKM di zona berisiko.
+        <h1 className="text-fig-sh4 text-primary-teal-70">Smart Tenant Matching</h1>
+        <p className="text-b7 text-neutral-900">
+          Kandidat tenant yang direkomendasikan AI untuk mengisi slot kosong stasiun
+        </p>
+        <p className="mt-1 text-b8 text-neutral-600">
+          Pilih UMKM di zona berisiko untuk melihat rekomendasi realokasi ke zona aman terdekat.
         </p>
       </header>
 
-      {!hasParamLocation && (
-        <div className="flex flex-col gap-2">
-          <Input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Cari UMKM di zona berisiko"
-            aria-label="Cari UMKM"
-          />
-          <div className="flex flex-wrap gap-2">
-            {isUmkmListLoading && <Skeleton className="h-8 w-48" />}
-            {!isUmkmListLoading && eligibleUmkm.length === 0 && (
-              <p className="text-b9 text-neutral-500">Tidak ada UMKM berisiko yang cocok.</p>
-            )}
-            {eligibleUmkm.slice(0, 10).map((umkm) => (
-              <button
-                key={umkm.id}
-                type="button"
-                onClick={() => setSelectedUmkmId(umkm.id)}
-                className={`h-9 rounded-full border px-3 text-b9 font-medium transition-colors ${
-                  umkm.id === selectedUmkmId
-                    ? "border-primary-500 bg-primary-500 text-neutral-0"
-                    : "border-border text-neutral-700 hover:bg-neutral-50"
-                }`}
-              >
-                {umkm.name ?? umkm.grid_id} &middot; {umkm.zone_label?.toUpperCase()}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {isZoneLoading && <p className="text-b8 text-neutral-500">Memuat zona...</p>}
-
-      {zone && (
-        <div className="flex flex-wrap items-center gap-3">
-          <Badge selectable={false}>{zone.zone_label.toUpperCase()}</Badge>
-          <ConfidenceBadge modelAccuracy={zone.model_accuracy} />
-          <span className="text-b8 text-neutral-600">
-            Berada di {zone.grid_id} ({zone.district_name ?? "-"})
-          </span>
-        </div>
-      )}
-
-      {zone && zone.ews_code === 0 && (
-        <p className="text-b8 text-neutral-600">
-          UMKM ini berada di zona aman -- tidak memerlukan realokasi.
-        </p>
-      )}
-
-      {isReallocationLoading && <p className="text-b8 text-neutral-500">Mencari rekomendasi...</p>}
-
-      {reallocation && !reallocation.eligible && reallocation.message && (
-        <p className="text-b8 text-neutral-600">{reallocation.message}</p>
-      )}
-
-      {reallocation && reallocation.eligible && (
-        <div className="flex flex-col gap-3 lg:flex-row">
-          <div className="flex w-full flex-col gap-2 lg:w-96">
-            <div className="flex items-center justify-between">
-              <h2 className="text-s6 font-semibold text-neutral-900">Daftar Kandidat</h2>
-              <ConfidenceBadge modelAccuracy={reallocation.zone?.model_accuracy ?? null} />
-            </div>
-            <ul className="flex flex-col gap-2">
-              {reallocation.candidates.map((candidate) => (
-                <li key={candidate.recommended_grid_id}>
+      <div className="flex flex-col gap-4 lg:flex-row">
+        {!hasParamLocation && (
+          <aside className="flex w-full shrink-0 flex-col gap-2 lg:w-72">
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Cari UMKM di zona berisiko"
+              aria-label="Cari UMKM"
+            />
+            <h2 className="text-s6 font-semibold text-neutral-900">
+              UMKM Berisiko ({eligibleUmkm.length})
+            </h2>
+            <div className="flex max-h-[420px] flex-col gap-2 overflow-y-auto">
+              {isUmkmListLoading &&
+                Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
+              {!isUmkmListLoading && eligibleUmkm.length === 0 && (
+                <p className="text-b9 text-neutral-500">Tidak ada UMKM berisiko yang cocok.</p>
+              )}
+              {!isUmkmListLoading &&
+                eligibleUmkm.map((umkm) => (
                   <button
+                    key={umkm.id}
                     type="button"
-                    onClick={() => setSelectedCandidate(candidate)}
-                    className={`flex w-full items-center justify-between rounded-xl border p-3 text-left transition-colors ${
-                      selectedCandidate?.recommended_grid_id === candidate.recommended_grid_id
-                        ? "border-primary-500 bg-primary-50"
-                        : "border-border hover:bg-neutral-50"
+                    onClick={() => selectUmkm(umkm.id)}
+                    aria-pressed={selectedUmkmId === umkm.id}
+                    className={`rounded-xl border p-3 text-left transition-colors hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 ${
+                      selectedUmkmId === umkm.id ? "border-primary-500 bg-primary-50" : "border-border"
                     }`}
                   >
-                    <span className="min-w-0">
-                      <span className="block truncate text-b9 font-semibold text-neutral-900">
-                        {candidate.recommended_district ?? candidate.recommended_grid_id}
-                      </span>
-                      <span className="block text-b9 text-neutral-500">
-                        Blok {candidate.recommended_grid_id}
-                        {candidate.crossed_district && " · lintas kawasan"}
-                      </span>
-                    </span>
-                    <span className="shrink-0 text-b8 font-semibold text-primary-600">
-                      {candidate.matching_score.toFixed(0)}%
-                    </span>
+                    <p className="text-b9 font-semibold text-neutral-900">{umkm.name ?? umkm.grid_id}</p>
+                    <p className="text-b9 text-neutral-500">
+                      {umkm.category} &middot; {umkm.district_name} &middot; {umkm.zone_label?.toUpperCase()}
+                    </p>
                   </button>
-                </li>
-              ))}
-            </ul>
-          </div>
+                ))}
+            </div>
+          </aside>
+        )}
 
-          <div className="flex-1 rounded-xl border border-border p-4">
-            <h2 className="mb-3 text-s6 font-semibold text-neutral-900">Detail Kandidat</h2>
-            {!selectedCandidate ? (
-              <p className="text-b9 text-neutral-500">Pilih kandidat di daftar untuk melihat detail.</p>
-            ) : (
-              <div className="flex flex-col gap-3">
-                <div>
-                  <p className="text-s7 font-semibold text-neutral-900">
-                    {selectedCandidate.recommended_district ?? selectedCandidate.recommended_grid_id}
-                  </p>
-                  <p className="text-b9 text-neutral-500">Blok {selectedCandidate.recommended_grid_id}</p>
-                </div>
-                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-b9">
-                  <dt className="text-neutral-500">Peringkat</dt>
-                  <dd className="text-neutral-800">#{selectedCandidate.rank}</dd>
-                  <dt className="text-neutral-500">Matching Score</dt>
-                  <dd className="text-neutral-800">{selectedCandidate.matching_score.toFixed(1)}%</dd>
-                  <dt className="text-neutral-500">Jarak dari Lokasi Asal</dt>
-                  <dd className="text-neutral-800">{selectedCandidate.distance_m.toFixed(0)} m</dd>
-                  <dt className="text-neutral-500">Lintas Kawasan</dt>
-                  <dd className="text-neutral-800">{selectedCandidate.crossed_district ? "Ya" : "Tidak"}</dd>
-                </dl>
-                <Link
-                  href={(() => {
-                    const centroid = polygonCentroid(selectedCandidate);
-                    return `/discovery-map/?lat=${centroid.lat}&lng=${centroid.lng}`;
-                  })()}
-                  className="mt-1 w-fit text-b9 font-semibold text-primary-600 hover:underline"
-                >
-                  Lihat di Discovery Map
-                </Link>
+        <div className="flex flex-1 flex-col gap-4">
+          {isZoneLoading && <Skeleton className="h-10 w-full" />}
+
+          {zone && (
+            <div className="flex flex-wrap items-center gap-3">
+              <Badge variant="secondary" selectable={false}>
+                {zone.zone_label.toUpperCase()}
+              </Badge>
+              <ConfidenceBadge modelAccuracy={zone.model_accuracy} />
+              <span className="text-b8 text-neutral-600">
+                {selectedUmkm?.name ?? "Lokasi ini"} berada di {zone.grid_id} ({zone.district_name ?? "-"})
+              </span>
+            </div>
+          )}
+
+          {zone && zone.ews_code === 0 && (
+            <p className="text-b8 text-neutral-600">UMKM ini berada di zona aman -- realokasi tidak diperlukan.</p>
+          )}
+
+          {isReallocationLoading && <Skeleton className="h-10 w-full" />}
+          {reallocation && !reallocation.eligible && reallocation.message && (
+            <p className="text-b8 text-neutral-600">{reallocation.message}</p>
+          )}
+
+          {location && (
+            <div className="relative">
+              <LeafletMap center={[location.lat, location.lng]} zoom={13}>
+                <ReallocationLayer
+                  origin={location}
+                  candidates={reallocation?.candidates ?? []}
+                  modelAccuracy={reallocation?.zone?.model_accuracy}
+                />
+              </LeafletMap>
+              <MapLegend />
+            </div>
+          )}
+
+          {reallocation && reallocation.eligible && (
+            <div className="flex flex-col gap-4 lg:flex-row">
+              <div className="flex-1">
+                <h2 className="text-fig-sh6 text-neutral-900">
+                  Daftar Kandidat ({reallocation.candidates.length})
+                </h2>
+                <ol className="mt-2 flex flex-col gap-2">
+                  {reallocation.candidates.map((candidate) => (
+                    <li key={candidate.recommended_grid_id}>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCandidateId(candidate.recommended_grid_id)}
+                        aria-pressed={selectedCandidate?.recommended_grid_id === candidate.recommended_grid_id}
+                        className={`flex w-full items-center justify-between gap-3 rounded-xl border p-4 text-left transition-colors hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 ${
+                          selectedCandidate?.recommended_grid_id === candidate.recommended_grid_id
+                            ? "border-primary-teal-60 bg-primary-teal-20"
+                            : "border-border"
+                        }`}
+                      >
+                        <span className="min-w-0">
+                          {/* ReallocationCandidate carries no UMKM name/category (these
+                              rows describe destination ZONES, not tenant businesses) --
+                              recommended_grid_id/district stand in as the real
+                              identifying label instead of a fabricated business name. */}
+                          <span className="block truncate text-fig-sh6 text-neutral-900">
+                            #{candidate.rank} {candidate.recommended_grid_id}
+                          </span>
+                          <span className="block truncate text-b7 text-neutral-400">
+                            {candidate.recommended_district ?? "Kawasan tidak diketahui"}
+                            {candidate.crossed_district ? " • Lintas kawasan" : ""}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-fig-sh5 text-primary-teal-70">
+                          {Math.round(candidate.matching_score)}%
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ol>
               </div>
-            )}
-          </div>
+
+              {selectedCandidate && (
+                <aside className="w-full shrink-0 rounded-xl border border-border p-4 lg:w-96">
+                  <h2 className="text-fig-sh6 text-neutral-900">Daftar Kandidat Terpilih</h2>
+
+                  {/* Candidate photo: not part of the data model at all (no product/
+                      tenant photo field on ReallocationCandidate or UmkmBusiness).
+                      Rather than invent an image URL or use an expiring Figma asset
+                      link, show a plain neutral placeholder box (same empty-state
+                      spirit as DokumentasiLapanganOverlay in
+                      app/modules/umkm-self-tracker/overlays.tsx). */}
+                  <div className="mt-3 flex h-32 w-full items-center justify-center rounded-xl bg-neutral-100 text-neutral-400">
+                    <ImageOff className="size-8" aria-hidden="true" />
+                    <span className="sr-only">Belum ada foto kandidat</span>
+                  </div>
+
+                  <dl className="mt-3 flex flex-col gap-2 text-b7">
+                    <div className="flex flex-col gap-0.5">
+                      {/* Placeholder -- no real data source for tenant "kategori" on a
+                          reallocation candidate (that's a UmkmBusiness field, and this
+                          candidate is a destination zone, not a business). */}
+                      <dt className="text-neutral-400">Kategori</dt>
+                      <dd className="text-neutral-900">Belum tersedia (contoh: Kuliner)</dd>
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      {/* Placeholder -- no capital/funding field exists anywhere in the
+                          data model (UmkmBusiness deliberately has no rent/revenue
+                          range, see app/types/umkm.ts). */}
+                      <dt className="text-neutral-400">Kapasitas Modal</dt>
+                      <dd className="text-neutral-900">Belum tersedia (contoh: Rp5.000.000)</dd>
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <dt className="text-neutral-400">Kesesuaian ESG</dt>
+                      <dd className="text-neutral-900">{esgSuitabilityLabel(selectedCandidate.matching_score)}</dd>
+                      <dd className="text-b9 text-neutral-400 italic">
+                        (berdasarkan matching score, bukan metrik ESG terpisah)
+                      </dd>
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <dt className="text-neutral-400">Lokasi</dt>
+                      <dd className="text-neutral-900">{candidateLocationLabel(selectedCandidate)}</dd>
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <dt className="text-neutral-400">Status</dt>
+                      <dd className="text-neutral-900">{candidateStatusLabel(selectedCandidate)}</dd>
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <dt className="text-neutral-400">Indeks Kerentanan</dt>
+                      <dd className="text-neutral-900">
+                        {selectedCandidate.recommended_feature.properties.vulnerability_index !== null
+                          ? selectedCandidate.recommended_feature.properties.vulnerability_index.toFixed(3)
+                          : "Tidak tersedia untuk grid ini"}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  <div className="mt-3 border-l-4 border-primary-teal-60 bg-primary-teal-20/40 p-3 text-b8 text-neutral-700 italic">
+                    Rekomendasi ini dihitung dari jarak ({selectedCandidate.distance_m.toFixed(0)} m), skor
+                    kecocokan ({Math.round(selectedCandidate.matching_score)}%), dan status lintas-kawasan
+                    grid tujuan -- bukan narasi AI bebas teks, karena backend belum menyediakan field insight
+                    naratif untuk kandidat realokasi.
+                  </div>
+
+                  <Link
+                    href={(() => {
+                      const centroid = polygonCentroid(selectedCandidate);
+                      return `/discovery-map/?lat=${centroid.lat}&lng=${centroid.lng}`;
+                    })()}
+                    className="mt-3 block w-fit text-b9 font-semibold text-primary-teal-70 hover:underline"
+                  >
+                    Lihat di Discovery Map
+                  </Link>
+
+                  {decisions[selectedCandidate.recommended_grid_id] ? (
+                    <p className="mt-3 text-b8 font-semibold text-neutral-700">
+                      Keputusan (belum tersimpan ke sistem):{" "}
+                      {decisions[selectedCandidate.recommended_grid_id] === "diterima" ? "Diterima" : "Ditolak"}
+                    </p>
+                  ) : (
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setDecisions((d) => ({ ...d, [selectedCandidate.recommended_grid_id]: "ditolak" }))
+                        }
+                        className="flex-1 rounded-[8px] border-[1.6px] border-behavior-red-20 p-2 text-fig-sh7 text-behavior-red-20 transition-opacity hover:opacity-90"
+                      >
+                        Tolak
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setDecisions((d) => ({ ...d, [selectedCandidate.recommended_grid_id]: "diterima" }))
+                        }
+                        className="flex-1 rounded-[8px] bg-primary-teal-60 p-2 text-fig-sh7 text-white transition-opacity hover:opacity-90"
+                      >
+                        Terima
+                      </button>
+                    </div>
+                  )}
+                  <p className="mt-2 text-b9 text-neutral-500">
+                    Keputusan ini hanya tersimpan di sesi browser Anda -- belum ada alur persetujuan tersimpan
+                    di backend.
+                  </p>
+                </aside>
+              )}
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -169,7 +169,7 @@ export default function DiscoveryMap() {
       {isGridError && (
         <p className="text-b8 text-destructive">
           Tidak dapat memuat peta zona -- pastikan backend berjalan di{" "}
-          {process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"}.
+          {process.env.NEXT_API_URL ?? "http://localhost:4000"}.
         </p>
       )}
 

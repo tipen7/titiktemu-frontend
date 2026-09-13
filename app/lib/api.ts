@@ -36,7 +36,7 @@ export async function apiFetch<T>(
   return response.json() as Promise<T>;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+const API_URL = process.env.NEXT_API_URL ?? "http://localhost:4000";
 
 export function fetchZones(): Promise<ZoneFeatureCollection> {
   return apiFetch<ZoneFeatureCollection>(`${API_URL}/api/zones`);

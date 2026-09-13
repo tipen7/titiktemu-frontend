@@ -83,7 +83,7 @@ Copy `.env.example` to `.env.local` and configure:
 | -------------------------------- | ----------------------------------- |
 | `NEXT_PUBLIC_SUPABASE_URL`       | Supabase project URL                |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY`  | Supabase browser-safe anonymous key |
-| `NEXT_PUBLIC_API_URL`            | Backend API gateway URL             |
+| `NEXT_API_URL`            | Backend API gateway URL             |
 | `NEXT_PUBLIC_MAPID_MAPS_API_KEY` | MAPID Maps basemap integration key  |
 
 Only browser-safe values should use the `NEXT_PUBLIC_` prefix. Never commit `.env.local`, access tokens, service-role keys, or other secrets.

@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { AppSidebar } from "@/app/components/ui/app-sidebar";
 import { SidebarProvider, SidebarTrigger } from "@/app/components/ui/sidebar";
+import { Providers } from "@/app/providers";
 
 import "./globals.css";
+import "leaflet/dist/leaflet.css";
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -13,13 +15,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className="h-full antialiased">
       <body className="min-h-full flex flex-col">
-        <SidebarProvider>
-          <AppSidebar />
-          <main>
-            <SidebarTrigger />
-            {children}
-          </main>
-        </SidebarProvider>
+        <Providers>
+          <SidebarProvider>
+            <AppSidebar />
+            <main className="flex-1">
+              <SidebarTrigger />
+              {children}
+            </main>
+          </SidebarProvider>
+        </Providers>
       </body>
     </html>
   );

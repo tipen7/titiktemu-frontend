@@ -1,19 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   FileChartColumnIncreasing,
   FilePenLine,
   Home,
+  LogOut,
   Map,
   MapPinned,
   PaletteIcon,
   UsersRound,
 } from "lucide-react";
+import { useAuth, type UserRole } from "@/app/lib/auth";
+import { Button } from "./button";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarHeader,
@@ -21,6 +25,13 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "./sidebar";
+
+const ROLE_LABELS: Record<UserRole, string> = {
+  pemda_admin: "Admin Pemda",
+  operator_tod: "Operator TOD",
+  umkm: "Pelaku Usaha",
+  public_user: "Pengguna",
+};
 
 const navigationItems = [
   { label: "Beranda", href: "/beranda/", icon: Home },
@@ -36,7 +47,7 @@ const navigationItems = [
   },
   {
     label: "Laporan Alokasi",
-    href: "/laporan-alokasi/",
+    href: "/report-allocation/",
     icon: FileChartColumnIncreasing,
   },
   { label: "Tenant Matching", href: "/tenant-matching/", icon: UsersRound },
@@ -46,6 +57,8 @@ const navigationItems = [
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, role, signOut } = useAuth();
 
   return (
     <Sidebar collapsible="icon" className="border-r-0 bg-neutral-50">
@@ -93,6 +106,31 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter className="gap-3 px-4 pb-6 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2">
+        {user && (
+          <div className="flex min-w-0 flex-col group-data-[collapsible=icon]:hidden">
+            <span className="truncate font-sans text-b7 font-medium text-secondary-800">
+              {user.email}
+            </span>
+            {role && (
+              <span className="font-sans text-b9 text-neutral-500">
+                {ROLE_LABELS[role]}
+              </span>
+            )}
+          </div>
+        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            void signOut().then(() => router.push("/login"));
+          }}
+          className="w-full justify-start gap-3 px-2 group-data-[collapsible=icon]:w-auto group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+        >
+          <LogOut className="size-5" strokeWidth={1.8} />
+          <span className="group-data-[collapsible=icon]:hidden">Keluar</span>
+        </Button>
+      </SidebarFooter>
     </Sidebar>
   );
 }
